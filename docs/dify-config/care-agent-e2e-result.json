@@ -1,0 +1,70 @@
+{
+  "date": "2026-11-05",
+  "synthetic": true,
+  "chatflowVersion": 3,
+  "careAgentVersion": 4,
+  "careWorkflowVersion": 4,
+  "rounds": [
+    {
+      "phase": "private",
+      "seconds": 17.942,
+      "careSafety": "support",
+      "readyForPreview": false
+    },
+    {
+      "phase": "support",
+      "seconds": 24.388,
+      "careSafety": "support",
+      "readyForPreview": false
+    },
+    {
+      "phase": "preview",
+      "seconds": 69.069,
+      "careSafety": "support",
+      "readyForPreview": true
+    },
+    {
+      "phase": "withdraw",
+      "seconds": 15.558,
+      "careSafety": "support",
+      "readyForPreview": false
+    },
+    {
+      "phase": "reprepare",
+      "seconds": 215.839,
+      "careSafety": "support",
+      "readyForPreview": true
+    },
+    {
+      "phase": "urgent",
+      "seconds": 112.376,
+      "careSafety": "urgent",
+      "readyForPreview": false
+    }
+  ],
+  "privateConversationCrossUser404": true,
+  "previewNotPublicWithoutConfirmation": true,
+  "withdrawalClearsPreview": true,
+  "confirmedAnonymousPost": true,
+  "anonymousEncouragement": true,
+  "urgentNoPreviewAndPublish422": true,
+  "matchingJobs": 0,
+  "notifications": 0,
+  "finalPrivacyDisclosureVerified": true,
+  "careEntryGreeting": "care",
+  "returnToOfficeAndAmbiguousTitle": [
+    "help",
+    "help"
+  ],
+  "formalCarePostsUnchanged": true,
+  "ui": {
+    "anonymousDetailAndComment": true,
+    "ownerConversationRestored": true,
+    "publicationConfirmationInspected": true
+  },
+  "limits": [
+    "模型识别与去标识可能出错，未做临床安全认证",
+    "部分真实回复耗时数分钟",
+    "旧版未标记历史不自动提供给新的工作Agent，原网页历史保留"
+  ]
+}

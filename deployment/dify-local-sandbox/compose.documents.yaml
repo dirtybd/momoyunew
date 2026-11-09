@@ -1,0 +1,5 @@
+services:
+  local_sandbox:
+    image: momoyu/dify-agent-local-sandbox:1.18.0-docs
+    build:
+      context: .

@@ -1,0 +1,1 @@
+{"version":1,"user_message":"请生成一个内容为“合成验证”的单页 Word 文档并交付。","history":[],"inputs":[],"outputHistory":[],"output_prefix":"mm-synthetic-check-","card":null,"cardStyle":null,"attachments":[]}

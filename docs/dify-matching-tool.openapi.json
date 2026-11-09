@@ -1,0 +1,75 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "摸摸鱼人员预匹配",
+    "version": "1.0.0",
+    "description": "调用人员匹配工作流，只返回匿名匹配统计；不发送通知。"
+  },
+  "servers": [
+    {
+      "url": "http://host.docker.internal:8792"
+    }
+  ],
+  "paths": {
+    "/match-preview": {
+      "post": {
+        "operationId": "preview_matches",
+        "summary": "为当前互助卡预匹配同事",
+        "description": "互助卡信息足够时，原样传入本轮服务端提供的 match_token。card_json 为 JSON 字符串：含 title、skills 数组和 deadline 字符串或 null，可附 problem、desiredOutcome 和 deliverables 数组；仅包含已确认需求。返回匿名候选数量、空闲待确认数和摘要，sent=false，不返回人员身份，不发送通知。普通办公和情绪支持不调用。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "match_token",
+                  "card_json"
+                ],
+                "properties": {
+                  "match_token": {
+                    "type": "string",
+                    "description": "本轮网页提供的短期预匹配授权，原样传入，不向用户展示。"
+                  },
+                  "card_json": {
+                    "type": "string",
+                    "description": "JSON 字符串：title、skills 数组、deadline 字符串或 null；可附 problem、desiredOutcome、deliverables 数组。仅使用已确认的互助需求，不传私人情绪对话。"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "真实匹配统计，无推送副作用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    },
+                    "timeUnconfirmed": {
+                      "type": "integer"
+                    },
+                    "mode": {
+                      "type": "string"
+                    },
+                    "sent": {
+                      "type": "boolean"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

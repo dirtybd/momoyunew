@@ -1,0 +1,30 @@
+import {test, expect} from '@playwright/test';
+
+test('查看档案后退出再注册，不残留旧资料或提交内部身份字段', async ({page, context}) => {
+  const stamp=Date.now();
+  const seeded=await context.request.post('/api/auth/register',{data:{username:`previous-${stamp}`,password:'RegisterTest2026!',displayName:'旧测试同事',department:'合成测试',acceptingHelp:false}});
+  expect(seeded.status()).toBe(201);
+  await page.goto('/');
+  await page.locator('.account').click();
+  await expect(page.getByRole('heading',{name:'个人档案',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'退出登录',exact:true}).click();
+  await page.locator('.topbar').getByRole('button',{name:'登录 / 注册',exact:true}).click();
+  await page.getByRole('button',{name:'注册与建档',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'创建账号与档案',exact:true});
+  await expect(dialog.getByRole('textbox',{name:'账号 *',exact:true})).toHaveValue('');
+  await expect(dialog.getByRole('textbox',{name:'姓名 *',exact:true})).toHaveValue('');
+  await expect(dialog.getByRole('textbox',{name:'部门 *',exact:true})).toHaveValue('');
+  await dialog.getByRole('textbox',{name:'账号 *',exact:true}).fill(`next-${stamp}`);
+  await dialog.getByLabel(/^密码/).fill('RegisterTest2026!');
+  await dialog.getByRole('textbox',{name:'姓名 *',exact:true}).fill('新测试同事');
+  await dialog.getByRole('textbox',{name:'部门 *',exact:true}).fill('新的合成测试部门');
+  const response=page.waitForResponse(r=>r.url().endsWith('/api/auth/register')&&r.request().method()==='POST');
+  await dialog.getByRole('button',{name:'注册并创建档案',exact:true}).click();
+  const registered=await response;
+  expect(registered.status()).toBe(201);
+  const sent=registered.request().postDataJSON();
+  expect(sent).not.toHaveProperty('id');
+  expect(sent).not.toHaveProperty('role');
+  await expect(dialog).not.toBeVisible();
+  await expect(page.locator('.account')).toContainText('新测试同事');
+});

@@ -1,0 +1,30 @@
+import {test, expect} from '@playwright/test';
+
+test('真实 Dify 网页两轮澄清与卡片预览', async ({page}) => {
+  test.skip(process.env.MOMOYU_DIFY_LIVE !== '1', '显式启用才调用真实 Dify');
+  test.setTimeout(420000);
+  await page.goto('/');
+  await page.getByRole('button',{name:'登录 / 注册',exact:true}).click();
+  await page.getByRole('button',{name:'注册与建档',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'创建账号与档案'});
+  await dialog.getByLabel('账号',{exact:true}).fill('dify-browser-'+Date.now());
+  await dialog.getByLabel('密码',{exact:true}).fill('LocalLiveTest2026');
+  await dialog.getByLabel('姓名',{exact:true}).fill('Dify演示测试');
+  await dialog.getByLabel('部门',{exact:true}).fill('接口验收');
+  await dialog.getByRole('button',{name:'注册并创建档案',exact:true}).click();
+  await expect(dialog).not.toBeVisible();
+  await page.getByRole('button',{name:'＋ 发起需求',exact:true}).click();
+  await expect(page.getByText('办公解答 · 需求整理 · 卡片设计',{exact:true})).toBeVisible();
+  await page.locator('#message').fill('我想发布互助需求，找同事协助核对两份Excel名单、找出漏项，但不太知道怎么描述。');
+  await page.getByRole('button',{name:'发送 ↑',exact:true}).click();
+  await expect(page.locator('.live-card h3')).not.toHaveText('未填写标题',{timeout:190000});
+  await expect(page.locator('.chat-msg.assistant')).toHaveCount(1,{timeout:190000});
+  await page.locator('#message').fill('以A名单为基准，按工号匹配，找出A有B无的人，交付包含工号和姓名的Excel差异清单，完成标准是漏项明细与统计总数一致。暂时没有截止时间。');
+  await page.getByRole('button',{name:'发送 ↑',exact:true}).click();
+  await expect(page.locator('.chat-msg.assistant')).toHaveCount(2,{timeout:190000});
+  await expect(page.locator('.live-card')).toContainText('工号');
+  await expect(page.getByRole('alert')).not.toBeVisible();
+  await page.screenshot({path:'.taste-skill/inspect-dify/clarify-desktop.png',fullPage:true});
+  await page.getByRole('button',{name:'预览并发布 →',exact:true}).click();
+  await expect(page.getByRole('dialog',{name:'确认发布到公屏'}).locator('.live-card')).toContainText('工号');
+});

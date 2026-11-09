@@ -1,0 +1,86 @@
+{
+  "date": "2026-11-05",
+  "synthetic": true,
+  "entrypoint": "chatflow",
+  "rounds": [
+    {
+      "phase": "generate",
+      "intent": "help",
+      "files": [
+        {
+          "name": "项目工作记录.docx",
+          "bytes": 36956
+        }
+      ],
+      "status": "draft"
+    },
+    {
+      "phase": "revise",
+      "intent": "help",
+      "files": [
+        {
+          "name": "项目工作记录.docx",
+          "bytes": 36966
+        }
+      ],
+      "status": "draft"
+    },
+    {
+      "phase": "handoff",
+      "intent": "request",
+      "files": [],
+      "status": "draft"
+    }
+  ],
+  "paragraphComparison": [
+    {
+      "paragraphs": [
+        "项目工作记录",
+        "项目：合成演示项目。",
+        "本周进展：已完成电气图纸核对。",
+        "下周计划：安排设备联调。"
+      ],
+      "stylesHash": "8fb74ca31506c908547b24e9f2e0642cf8121ff52c4f9777721eaa431f13f764",
+      "bytes": 36956
+    },
+    {
+      "paragraphs": [
+        "项目工作记录",
+        "项目：合成演示项目。",
+        "本周进展：已完成电气图纸核对。",
+        "下周计划：完成设备联调并记录问题。"
+      ],
+      "stylesHash": "8fb74ca31506c908547b24e9f2e0642cf8121ff52c4f9777721eaa431f13f764",
+      "bytes": 36966
+    }
+  ],
+  "roundsSeconds": [
+    86.5,
+    68.0,
+    32.4
+  ],
+  "unchangedOriginalDownload": true,
+  "crossUserDownload404": true,
+  "validSignedArtwork": true,
+  "published": false,
+  "notificationsSent": false,
+  "independentRenderedPages": [
+    1,
+    1
+  ],
+  "independentPagesViewed": true,
+  "browserRestored": true,
+  "browserDownload": true,
+  "additionalChecks": {
+    "legacyCareDelegation": true,
+    "authorizedTxtRead": true,
+    "cardTitleContinuation": true,
+    "cardArtworkPreserved": true,
+    "privateOutputSharingInstruction": true
+  },
+  "limits": [
+    "合成一页样例，不代表所有复杂文档均通过",
+    "生成成果仍为本人私有，需本人选择并上传为需求附件",
+    "Dify UI空材料测试存在客户端错误，实际Service API空材料路径通过"
+  ]
+}

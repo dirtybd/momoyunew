@@ -1,0 +1,12 @@
+{
+  "openapi":"3.0.0",
+  "info":{"title":"摸摸鱼卡片制作","version":"1.0.0","description":"根据 Agent 自主设计的图形与配色生成卡片背景成品；不发布、不读取员工资料。"},
+  "servers":[{"url":"http://host.docker.internal:8792"}],
+  "paths":{"/design-card":{"post":{
+    "operationId":"design_card",
+    "summary":"制作个性需求卡片",
+    "description":"为当前网页会话制作卡片视觉成品。必须使用本轮网页提供的 job_token。design_json 是设计对象的 JSON 字符串：name、paper、accent、sky 为六位十六进制颜色(名称除外)；shape=standard|ticket|polaroid|bubble，layout=standard|poster|note；elements 为1到50个图形，画布1200×400。支持 circle(cx,cy,r)、ellipse(cx,cy,rx,ry)、rect(x,y,width,height,rx)、line(x1,y1,x2,y2)、path(d)，每个图形可带 fill(颜色或none)、stroke(颜色)、strokeWidth、opacity。自主组合图形设计风景、抽象图案或趣味插画，不写文字、不使用图片URL/HTML/脚本。返回带签名的 card_artifact，网页会自动接收；不要在最终回答复制SVG、签名或凭证。",
+    "requestBody":{"required":true,"content":{"application/json":{"schema":{"type":"object","required":["job_token","design_json"],"properties":{"job_token":{"type":"string","description":"网页在本轮提供的卡片制作凭证，原样传入，不向用户展示。"},"design_json":{"type":"string","description":"自主设计的JSON字符串，包括name,paper,accent,sky,shape,layout,elements。"}}}}}},
+    "responses":{"200":{"description":"已完成的卡片背景SVG和结构化设计，附当前会话签名","content":{"application/json":{"schema":{"type":"object","properties":{"card_artifact":{"type":"object"},"signature":{"type":"string"}}}}}}}
+  }}}
+}

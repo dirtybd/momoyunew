@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-05",
+  "data": "synthetic only; isolated databases",
+  "office": {
+    "firstMs": 13048,
+    "totalMs": 14472,
+    "updates": 29,
+    "intent": "help",
+    "columns": 5,
+    "rows": 3,
+    "followupListItems": 2,
+    "lastStreamMatchesFinal": true,
+    "browserTableVerified": true
+  },
+  "card": {
+    "server": "isolated 8806",
+    "totalMs": 17729,
+    "intent": "request",
+    "clarificationListItems": 2,
+    "generatedArtwork": false,
+    "published": false,
+    "streamingBody": false
+  },
+  "knownVerificationException": {
+    "server": "earlier isolated 8800",
+    "missingFinalResults": 2,
+    "cause": "unresolved; independent process retest succeeded",
+    "claimedFixed": false
+  }
+}

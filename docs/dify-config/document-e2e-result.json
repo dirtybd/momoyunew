@@ -1,0 +1,211 @@
+{
+  "date": "2026-11-03",
+  "synthetic": true,
+  "scope": "one-page generation and revision through website API",
+  "historyPreserved": true,
+  "crossUserDownloadDenied": true,
+  "rounds": [
+    {
+      "phase": "round1",
+      "tools": [
+        {
+          "tool": "document_plan",
+          "success": true,
+          "result": {
+            "status": "ready",
+            "title": "申请资料表 / Application Details Sheet",
+            "format": "docx",
+            "sections": [
+              {
+                "heading": "申请人信息 / Applicant Details",
+                "kind": "table",
+                "fields": [
+                  "项目 / Item",
+                  "申请人一 / Applicant 1",
+                  "申请人二 / Applicant 2",
+                  "申请人姓名 / Applicant Name",
+                  "护照号码 / Passport No.",
+                  "计划入境德国日期 / Planned Date of Entry into Germany",
+                  "计划返回中国日期 / Planned Date of Return to China",
+                  "职位 / Position",
+                  "职责 / Responsibilities"
+                ],
+                "instructions": "标题后直接放置一个真实 Word 三列表格，不加标题装饰线、分隔线或底纹。页边距约 2.0 cm。列宽约 5.0 cm、6.0 cm、6.0 cm，总宽约 17.0 cm。表头行：项目 / Item、申请人一 / Applicant 1、申请人二 / Applicant 2，加粗。依次设置六行字段：申请人姓名 / Applicant Name、护照号码 / Passport No.、计划入境德国日期 / Planned Date of Entry into Germany、计划返回中国日期 / Planned Date of Return to China，以上四行的两位申请人对应单元格留空，保持为空单元格，不用下划线或占位符；职位 / Position 行分别填写“电气工程师 / Electrical Engineer”和“机械工程师 / Mechanical Engineer”；职责 / Responsibilities 行分别填写“指导电气调试和设备操作培训 / Supervise electrical commissioning and equipment operation training”和“指导机械安装 / Supervise mechanical installation”。中英文标签同格呈现，英文紧随中文。表头及空白行高约 0.9–1.0 cm，职位行高约 1.2 cm，职责行高约 3.0 cm，允许自动换行。表格边框使用清晰单线（约 0.5 pt），无花哨样式。标题居中加粗约 20 pt；表内文字约 10 pt，中文宋体，英文 Arial。"
+              }
+            ],
+            "missingFields": [
+              "申请人一姓名 / Applicant 1 name",
+              "申请人一护照号码 / Applicant 1 passport No.",
+              "申请人一计划入境德国日期 / Applicant 1 planned date of entry into Germany",
+              "申请人一计划返回中国日期 / Applicant 1 planned date of return to China",
+              "申请人二姓名 / Applicant 2 name",
+              "申请人二护照号码 / Applicant 2 passport No.",
+              "申请人二计划入境德国日期 / Applicant 2 planned date of entry into Germany",
+              "申请人二计划返回中国日期 / Applicant 2 planned date of return to China"
+            ],
+            "questions": [],
+            "layout": {
+              "pageSize": "A4",
+              "orientation": "portrait",
+              "latinFont": "Arial",
+              "cjkFont": "SimSun"
+            },
+            "checks": [
+              "生成后确认文档为单页 A4 纵向，页边距约 2.0 cm。",
+              "标题为“申请资料表 / Application Details Sheet”，标题下方无装饰线或分隔线。",
+              "正文为真实 Word 表格，所有单元格可编辑，不用制表符、文本框或图片模拟。",
+              "中英文标签位于同一单元格，英文紧随中文，一一对应。",
+              "姓名、护照号码、入境日期、返回日期对应单元格保持空白，无下划线或占位符。",
+              "两位申请人的职位与职责按已知内容完整填写，职责文本不被截断。",
+              "不添加官方声明、法定声明、签字盖章栏或附件页。",
+              "表格边框清晰但不花哨，列宽与行高适合单页填写。",
+              "生成前确认 Arial 与 SimSun 在目标环境可用；如不可用，替换为等效常见字体并复查版式。"
+            ]
+          }
+        },
+        {
+          "tool": "document_content_review",
+          "success": true,
+          "result": {
+            "verdict": "no_content_issue_found",
+            "scope": "content_only",
+            "visualVerified": false,
+            "issues": [],
+            "summary": "已核对标题、7×3表格中的六项字段、中英标签对应、四项个人信息留空、已知职位与职责，以及未出现额外声明或附件页；未提供页面图像，无法验证A4单页、字体、分页或实际排版。"
+          }
+        },
+        {
+          "tool": "document_visual_review",
+          "success": false
+        },
+        {
+          "tool": "document_visual_review",
+          "success": true,
+          "result": {
+            "pageTitle": "申请资料表 / Application Details Sheet",
+            "observedText": "申请资料表 / Application Details Sheet；项目 / Item、申请人一 / Applicant 1、申请人二 / Applicant 2；申请人姓名 / Applicant Name、护照号码 / Passport No.、计划入境德国日期 / Planned Date of Entry into Germany、计划返回中国日期 / Planned Date of Return to China；职位 / Position：电气工程师 / Electrical Engineer、机械工程师 / Mechanical Engineer；职责 / Responsibilities：指导电气调试和设备操作培训 / Supervise electrical commissioning and equipment operation training、指导机械安装 / Supervise mechanical installation",
+            "verdict": "pass",
+            "issues": [],
+            "limitations": [
+              "仅能依据单页图像判断版式与可读性，无法核实申请人身份、日期等事实信息。",
+              "无法判断打印效果、其他页面或机构的具体提交要求。"
+            ]
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "申请资料表.docx",
+          "bytes": 37619,
+          "sha256": "69e27e46976b47c844b6d48cb65225558ae4a347f34b8e5b823190e739713ec8"
+        },
+        {
+          "name": "申请资料表.pdf",
+          "bytes": 41601,
+          "sha256": "f2e548416789a94a8799f5a3e5121eef6943c653cdb5d3df02642612f8c12689"
+        }
+      ],
+      "independentRender": {
+        "scope": "rendered_not_visually_reviewed",
+        "visualVerified": false,
+        "sourceSha256": "69e27e46976b47c844b6d48cb65225558ae4a347f34b8e5b823190e739713ec8",
+        "pages": 1,
+        "dpi": 110,
+        "fonts": {
+          "Noto Sans CJK SC": "Noto Sans CJK SC",
+          "Liberation Sans": "Liberation Sans"
+        },
+        "images": [
+          "page-1.png"
+        ],
+        "text": "text.txt",
+        "nextStep": "用图像读取工具逐页查看这些PNG，局部修改后重渲染；本报告本身不证明视觉合格。"
+      }
+    },
+    {
+      "phase": "round2",
+      "tools": [
+        {
+          "tool": "document_edit_plan",
+          "success": true,
+          "result": {
+            "status": "needs_clarification",
+            "scope": "edit_plan_only",
+            "questions": [
+              "提示文字应作为表格第8行（新增表格行），还是作为表格下方独立段落？现有要求“在表格末尾新增一行提示”与“不新增表格行或字段”存在冲突。",
+              "若改为表格下方独立段落，是否允许为保持单页A4仅微调段后间距或行距？"
+            ],
+            "changes": [
+              {
+                "target": "[P] 标题行：申请资料表 / Application Details Sheet",
+                "action": "replace_text",
+                "before": "申请资料表 / Application Details Sheet",
+                "after": "申请资料表 / Application Information Form"
+              }
+            ],
+            "preserve": [
+              "中文标题“申请资料表”不变",
+              "表格仍为7行3列，不新增表格字段",
+              "R2至R5个人信息单元格仍留空",
+              "R6职位与R7职责文字不变",
+              "不添加装饰线",
+              "保持单页A4纵向版式",
+              "原件保留，另存新版本"
+            ],
+            "checks": [
+              "回读英文标题为 Application Information Form，中文标题仍为申请资料表",
+              "确认除英文标题外无其他既有文字被改动",
+              "确认表格仍为7行3列且R2至R5仍为空",
+              "确认R6、R7内容逐字未变",
+              "待确认提示行位置后，校验提示文字准确且仅出现一次",
+              "渲染检查仍为单页A4纵向，无装饰线"
+            ]
+          }
+        },
+        {
+          "tool": "document_visual_review",
+          "success": true,
+          "result": {
+            "pageTitle": "申请资料表 / Application Information Form",
+            "observedText": "申请资料表 / Application Information Form；项目 / Item；申请人一 / Applicant 1；申请人二 / Applicant 2；申请人姓名 / Applicant Name；护照号码 / Passport No.；计划入境德国日期 / Planned Date of Entry into Germany；计划返回中国日期 / Planned Date of Return to China；职位 / Position；电气工程师 / Electrical Engineer；机械工程师 / Mechanical Engineer；职责 / Responsibilities；指导电气调试和设备操作培训 / Supervise electrical commissioning and equipment operation training；指导机械安装 / Supervise mechanical installation；请仅填写本次申请所需信息 / Provide only the information required for this application",
+            "verdict": "pass",
+            "issues": [],
+            "limitations": [
+              "无法与上一版表格逐项比对，仅能依据当前图片判断。",
+              "无法核实机构对格式或双语措辞的原始要求。",
+              "图片仅展示当前页，无法核实源文件是否还含其他页面。"
+            ]
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "申请资料表-修订.docx",
+          "bytes": 37730,
+          "sha256": "6656840d74c7cb78d2d7d8903a8e22c519a0383f374a861a3725de98f038d5f4"
+        },
+        {
+          "name": "申请资料表-修订.pdf",
+          "bytes": 43933,
+          "sha256": "eb4863e2e9ae85d9062c58a8682e39aac8d3f1cfb397b3b2b9750966d49c4c56"
+        }
+      ],
+      "independentRender": {
+        "scope": "rendered_not_visually_reviewed",
+        "visualVerified": false,
+        "sourceSha256": "6656840d74c7cb78d2d7d8903a8e22c519a0383f374a861a3725de98f038d5f4",
+        "pages": 1,
+        "dpi": 110,
+        "fonts": {
+          "Noto Sans CJK SC": "Noto Sans CJK SC",
+          "Liberation Sans": "Liberation Sans"
+        },
+        "images": [
+          "page-1.png"
+        ],
+        "text": "text.txt",
+        "nextStep": "用图像读取工具逐页查看这些PNG，局部修改后重渲染；本报告本身不证明视觉合格。"
+      }
+    }
+  ]
+}

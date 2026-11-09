@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-05",
+  "synthetic": true,
+  "upload": {
+    "synthetic": true,
+    "bytes": 52428800,
+    "status": 201,
+    "elapsedMs": 2756,
+    "accepted": true
+  },
+  "read": {
+    "synthetic": true,
+    "selected": 10,
+    "cached": 10,
+    "allVerificationCodes": true,
+    "sum55": true,
+    "reply": "已实际读取10个小TXT：material-1.txt→LOTUS-1，material-2.txt→LOTUS-2，material-3.txt→LOTUS-3，material-4.txt→LOTUS-4，material-5.txt→LOTUS-5，material-6.txt→LOTUS-6，material-7.txt→LOTUS-7，material-8.txt→LOTUS-8，material-9.txt→LOTUS-9，material-10.txt→LOTUS-10。编号1到10求和为55。"
+  },
+  "tests": 37,
+  "build": "passed",
+  "legacyAgentVersion": 25,
+  "chatflowRelease": 5,
+  "officeWorkflowRelease": 6,
+  "cardWorkflowRelease": 6
+}

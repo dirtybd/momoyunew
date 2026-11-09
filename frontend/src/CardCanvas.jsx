@@ -1,0 +1,41 @@
+import React,{useEffect,useId,useRef,useState} from 'react';
+import {normalizeCardStyle} from '../../shared/card-style.mjs';
+import {FilePicker} from './Attachments.jsx';
+import {TaskEconomy,RewardOffer} from './TaskEconomy.jsx';
+import './CardCanvas.css';
+const choices={theme:[['orange','暖橙'],['ink','深墨'],['mint','薄荷'],['sand','沙色'],['rose','玫瑰'],['sky','晴空']],layout:[['standard','标准'],['poster','海报'],['note','便笺']],shape:[['standard','标准'],['ticket','票根'],['polaroid','拍立得'],['bubble','气泡']],background:[['none','无预置图'],['mountain','山景'],['coast','海岸'],['meme','摸鱼插画']],radius:[['soft','柔和'],['square','方角']],emphasis:[['normal','常规'],['bold','加重']]};
+const positions=['center','top','bottom','left','right'],positionNames=['居中','靠上','靠下','靠左','靠右'];
+const asText=value=>Array.isArray(value)?value.join('\n'):(value||'');
+const splitList=value=>value.split(/[,，\n]/).map(s=>s.trim()).filter(Boolean);
+export function visualStyle(style={}){const {coverPosition,...rest}=style;return {...normalizeCardStyle(rest),coverPosition:positions.includes(coverPosition)?coverPosition:'center'}}
+function AutoField({value,onChange,label,placeholder,disabled,maxLength=2000,className='',title=false}){
+ const ref=useRef();
+ useEffect(()=>{const el=ref.current;if(!el)return;const fit=()=>{el.style.height='auto';el.style.height=Math.max(el.scrollHeight,24)+'px'};fit();const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))fit()});observer.observe(el);window.addEventListener('resize',fit);return()=>{observer.disconnect();window.removeEventListener('resize',fit)}},[value]);
+ return <label className={'canvas-edit-field '+className}>
+  {label&&<span className="canvas-edit-label">{label}</span>}
+  <textarea ref={ref} rows="1" aria-label={label||placeholder} disabled={disabled} maxLength={maxLength} value={value||''} placeholder={placeholder} onChange={e=>onChange(e.target.value)} onKeyDown={title?e=>{if(e.key==='Enter'&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.blur()}}:undefined}/>
+ </label>;
+}
+export function CardCanvas({value,onChange,onImage,disabled=false,official=false}){
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');const uid=useId(),s=visualStyle(value.cardStyle);
+ const cover=official?value.coverUrl:value.cardCover?.url;
+ const patch=(key,text)=>onChange(current=>({...current,[key]:Array.isArray(current[key])?text.split('\n').map(v=>v.trim()).filter(Boolean):text}));
+ const skillsText=Array.isArray(value.skills)?value.skills.join('，'):(value.skills||'');
+ const changeSkills=text=>onChange(current=>({...current,skills:Array.isArray(current.skills)?splitList(text):text}));
+ function imageChange(media,purpose){onChange(current=>({...current,...(official?(purpose==='cover'?{coverMediaId:media?.id??null,coverUrl:media?.url??null}:{rewardMediaId:media?.id??null,rewardUrl:media?.url??null}):(purpose==='cover'?{coverAttachmentId:media?.id??null,cardCover:media?{url:media.url}:null,selectedCoverId:media?.id??null}:{rewardAttachmentId:media?.id??null,rewardImage:media?{url:media.url}:null,selectedRewardId:media?.id??null}))}))}
+ async function upload(files,purpose){if(!files.length)return;setBusy(true);setError('');try{const media=await onImage(files[0],purpose);imageChange(media,purpose)}catch(e){setError(e.message)}finally{setBusy(false)}}
+ const classes=`live-card card-canvas ${cover||value.cardArtwork?'card-artwork ':''}card-theme-${s.theme} card-layout-${s.layout} card-radius-${s.radius} card-emphasis-${s.emphasis} card-background-${s.background} card-shape-${s.shape}`;
+ const currentImage=value.rewardImage?.url||value.rewardUrl;
+ return <article className={classes} style={{...(cover?{'--cover-image':`url("${cover}")`}:value.cardArtwork?{'--cover-image':`url("/api/requests/${encodeURIComponent(value.id)}/artwork.svg?v=${value.cardArtwork.id}")`,'--card-bg':value.cardArtwork.design.paper,'--card-ink':value.cardArtwork.design.ink,'--card-muted':value.cardArtwork.design.ink,'--card-accent':value.cardArtwork.design.ink,'--card-border':value.cardArtwork.design.ink+'26'}:{}),'--cover-position':s.coverPosition}}>
+ {onChange&&<div className="canvas-image-tools"><FilePicker imagesOnly multiple={false} disabled={disabled||busy} onFiles={files=>upload(files,'cover')} label={busy?'上传中…':cover?'替换背景':'上传背景'}/>{cover&&<button type="button" className="text-button" disabled={disabled||busy} onClick={()=>imageChange(null,'cover')}>移除背景</button>}<label className="canvas-focus">焦点<select disabled={disabled||busy} value={s.coverPosition} onChange={e=>onChange(current=>({...current,cardStyle:{...visualStyle(current.cardStyle),coverPosition:e.target.value}}))}>{positions.map((p,i)=><option key={p} value={p}>{positionNames[i]}</option>)}</select></label></div>}
+ {onChange&&<details className="canvas-style-details"><summary>外观</summary><div>{Object.entries(choices).map(([key,options])=><label key={key}>{({theme:'配色',layout:'版式',shape:'轮廓',background:'预置背景',radius:'圆角',emphasis:'字重'})[key]}<select disabled={disabled||busy} value={s[key]} onChange={e=>onChange(current=>({...current,cardStyle:{...visualStyle(current.cardStyle),[key]:e.target.value}}))}>{options.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>)}</div></details>}
+ <div className="live-top"><span>{official?(value.kind==='bounty'?'官方悬赏':'官方公告'):'需求卡片'}</span><span>{value.anonymous?'匿名展示':'公司公屏'}</span></div>
+ {onChange?<div className="canvas-text-fields">
+  <AutoField title className="canvas-edit-title" value={value.title} onChange={text=>patch('title',text.replace(/\n/g,' '))} placeholder="卡片标题" maxLength={200}/>
+  <AutoField className="canvas-edit-problem" value={value.problem} onChange={text=>patch('problem',text)} placeholder="写下你希望解决的困扰。" maxLength={2000}/>
+  {value.kind!=='announcement'&&<div className="canvas-edit-details">{[['desiredOutcome','希望达成',2000],['deliverables','交付物',10019],['acceptanceCriteria','完成标准',10019]].map(([key,label,maxLength])=><AutoField key={key} label={label} maxLength={maxLength} value={asText(value[key])} onChange={text=>patch(key,text)} placeholder="待补充"/>) }</div>}
+ </div>:<><h3>{value.title||'卡片标题'}</h3><p>{value.problem||'写下你希望解决的困扰。'}</p>{value.kind!=='announcement'&&<div className="live-detail">{[['desiredOutcome','希望达成'],['deliverables','交付物'],['acceptanceCriteria','完成标准']].map(([key,label])=><div key={key}><small>{label}</small><p>{Array.isArray(value[key])?value[key].join('、'):value[key]||'待补充'}</p></div>)}</div>}</>}
+ {onChange?<div className="canvas-reward"><label htmlFor={uid+'reward'}>发布人报酬（选填）</label><textarea id={uid+'reward'} rows="2" maxLength={500} disabled={disabled||busy} value={value.rewardText||''} onChange={e=>patch('rewardText',e.target.value)} placeholder="例如：请一杯咖啡，或说明一份小心意"/>{currentImage&&<img src={currentImage} alt="报酬图片预览"/>}<div className="canvas-reward-tools"><FilePicker imagesOnly multiple={false} disabled={disabled||busy} onFiles={files=>upload(files,'reward')} label={currentImage?'替换报酬图片':'添加报酬图片'}/>{currentImage&&<button type="button" className="text-button" disabled={disabled||busy} onClick={()=>imageChange(null,'reward')}>移除图片</button>}</div><p className="field-hint">文字与一张图片可同时展示；平台不收款或支付。保存前请检查图片内容。</p></div>:<RewardOffer request={value}/>}
+ <TaskEconomy request={value} hideOffer/>{onChange?<div className="live-bottom canvas-live-bottom"><label className="canvas-foot-field"><span>技能</span><input value={skillsText} disabled={disabled||busy} placeholder="技能待补充" onChange={e=>changeSkills(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.blur()}}}/></label><label className="canvas-foot-field"><span>截止</span><input value={value.deadline||''} disabled={disabled||busy} placeholder="时间待商量" onChange={e=>patch('deadline',e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.blur()}}}/></label></div>:<div className="live-bottom"><span>{Array.isArray(value.skills)?value.skills.join(' / '):value.skills||'技能待补充'}</span><span>{value.deadline||'时间待商量'}</span></div>}{onChange&&<p className="canvas-image-note">背景与报酬图片保存后公开展示脱敏预览，不供AI读取、不提供原件。</p>}{error&&<p className="inline-error" role="alert">{error}</p>}
+ </article>
+}

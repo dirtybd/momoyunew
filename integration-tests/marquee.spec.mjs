@@ -1,0 +1,66 @@
+import {test,expect} from '@playwright/test';
+
+test('卡片按需求数量分行并真实滚动，悬停、手动暂停和详情暂停均可用',async({page})=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.goto('/');
+ const wall=page.locator('.marquee-wall'), track=page.locator('.marquee-track').first();
+ await expect(page.locator('.marquee-lane')).toHaveCount(2);
+ await expect(track).toHaveCSS('animation-play-state','running');
+ const position=()=>track.evaluate(el=>getComputedStyle(el).transform);
+ const before=await position();await page.waitForTimeout(200);
+ expect(await position()).not.toBe(before);
+ await wall.hover();
+ await expect(track).toHaveCSS('animation-play-state','paused');
+ const stopped=await position();await page.waitForTimeout(200);
+ expect(await position()).toBe(stopped);
+ await page.locator('.marquee-toggle').click();
+ await expect(track).toHaveCSS('animation-play-state','paused');
+ await page.locator('.marquee-toggle').click();
+ await expect(track).toHaveCSS('animation-play-state','running');
+  await wall.hover();
+  await expect(track).toHaveCSS('animation-play-state','paused');
+ await page.locator('.marquee-card').first().click();
+ await expect(page.getByRole('dialog',{name:'需求详情'})).toBeVisible();
+ await expect(wall).toHaveClass(/is-paused/);
+});
+
+test('普通问题不生成卡片，对话改样式后预览、发布和刷新保留',async({page})=>{
+ const stamp=Date.now();
+ await page.goto('/');
+ await page.getByRole('button',{name:'登录 / 注册',exact:true}).click();
+ await page.getByRole('button',{name:'注册与建档',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'创建账号与档案'});
+ for(const [label,value]of [['账号','style-'+stamp],['密码','StyleTest2026'],['姓名','样式验收'],['部门','演示测试']])await dialog.getByLabel(label,{exact:true}).fill(value);
+ await dialog.getByRole('button',{name:'注册并创建档案',exact:true}).click();
+ await expect(dialog).not.toBeVisible();
+ await page.getByRole('button',{name:'＋ 发起需求',exact:true}).click();
+ async function say(message){await page.locator('#message').fill(message);const response=page.waitForResponse(r=>r.url().endsWith('/api/clarify')&&r.request().method()==='POST');await page.getByRole('button',{name:'发送 ↑',exact:true}).click();const raw=await(await response).text();const data=JSON.parse(raw.match(/event: result\ndata: (.*)/)[1]);await expect(page.locator('#message')).toHaveValue('');return data;}
+ const help=await say('Excel 怎么求和？');
+ expect(help.intent).toBe('help');expect(help.hasCard).toBe(false);
+ await expect(page.locator('.live-card')).toHaveCount(0);
+ expect((await(await page.request.get('/api/me/requests')).json()).drafts).toHaveLength(0);
+ const title='样式卡片验收-'+stamp;
+ const request=await say(`标题：${title}\n问题：需要核对名单\n目标：列出漏项\n交付物：差异清单\n技能：Excel`);
+ expect(request.request.id).toBe(help.request.id);
+ await say('把这张卡改成深蓝海报，大圆角，标题加粗');
+ await expect(page.locator('.live-card')).toHaveClass(/card-theme-ink/);
+ await expect(page.locator('.live-card')).toHaveClass(/card-layout-poster/);
+ await expect(page.locator('.live-card')).toHaveClass(/card-emphasis-bold/);
+ await expect(page.locator('.live-card')).toContainText(title);
+  await say('背景换成海边风景，卡片形状用拍立得，保留配色和正文');
+  await expect(page.locator('.live-card')).toHaveClass(/card-background-coast/);
+  await expect(page.locator('.live-card')).toHaveClass(/card-shape-polaroid/);
+  await expect(page.locator('.live-card')).toHaveClass(/card-theme-ink/);
+ await page.getByRole('button',{name:'预览并发布 →',exact:true}).click();
+ const confirm=page.getByRole('dialog',{name:'确认发布到公屏'});
+ await expect(confirm.locator('.live-card')).toHaveClass(/card-theme-ink/);
+ await confirm.getByRole('button',{name:'确认发布',exact:true}).click();
+ await expect(confirm).not.toBeVisible();
+ await page.reload();
+ await page.getByRole('searchbox',{name:'搜索需求'}).fill(title);
+ await expect(page.locator('.marquee-card').first()).toHaveClass(/card-theme-ink/);
+  await expect(page.locator('.marquee-card').first()).toHaveClass(/card-background-coast/);
+  await expect(page.locator('.marquee-card').first()).toHaveClass(/card-shape-polaroid/);
+ await page.locator('.request-row').filter({hasText:title}).click();
+ await expect(page.getByRole('dialog',{name:'需求详情'}).locator('.detail-card')).toHaveClass(/card-theme-ink/);
+});

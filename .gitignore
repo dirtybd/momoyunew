@@ -1,0 +1,19 @@
+node_modules/
+dist/
+data/
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+work/
+test-results/
+playwright-report/
+.taste-skill/inspect*/
+*.log
+__pycache__/
+
+# Local scratch file
+/24

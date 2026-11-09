@@ -1,0 +1,15 @@
+{
+  "legacyAgentId": "01a18a67-3f52-759f-9409-75bda6e070ef",
+  "officeAgentId": "01a1a95b-9e6e-7ec7-869f-9286400c9819",
+  "cardAgentId": "01a1a96a-7a64-7255-956e-8baaf2bb189c",
+  "careAgentId": "01a1a991-9f29-75e6-b70c-c3b48b6212b3",
+  "officeWorkflowId": "6465a5eb-b847-49f4-b810-0fc06e31ece6",
+  "cardWorkflowId": "e3788c7a-eedf-4a18-8377-71ce3817b432",
+  "careWorkflowId": "d0212133-9ccd-40e7-9bb2-902358fcf96b",
+  "chatflowId": "0014ecfa-6832-4193-8afb-b2bed6a212c3",
+  "tools": {
+    "office": {"providerId":"f782258e-626f-46b6-b24e-e27d85b7fb46","toolName":"momoyu_office","label":"摸摸鱼·办公执行"},
+    "card": {"providerId":"041e4b75-9cc9-47e3-9abd-edaf92cf9492","toolName":"momoyu_card","label":"摸摸鱼·互助执行"},
+    "care": {"providerId":"43fc8e29-593f-4925-8925-fbce7053cc33","toolName":"momoyu_care","label":"摸摸鱼·情感支持"}
+  }
+}

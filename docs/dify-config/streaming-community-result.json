@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-05",
+  "synthetic": true,
+  "chatflowRelease": 4,
+  "baselineCareToolAverageSeconds": 84.9,
+  "rounds": [
+    {
+      "phase": "care",
+      "firstTextMs": 7820,
+      "totalMs": 10509,
+      "chunks": 34,
+      "intent": "care",
+      "privatePreview": false
+    },
+    {
+      "phase": "office",
+      "firstTextMs": 4353,
+      "totalMs": 6292,
+      "chunks": 42,
+      "intent": "help",
+      "privatePreview": false
+    },
+    {
+      "phase": "preview",
+      "firstTextMs": 7491,
+      "totalMs": 9174,
+      "chunks": 16,
+      "intent": "care",
+      "privatePreview": true
+    }
+  ],
+  "complete": true,
+  "automatedTests": 37,
+  "build": "passed",
+  "photoAccess": "owner-only before confirmation; logged-in colleagues after publication; revoked on removal/archive",
+  "imageContentReview": false,
+  "ui": "Computer Use desktop and narrow viewport; synthetic photo upload, preview, real text review, publication, gallery navigation, edit and cancel",
+  "limitations": [
+    "Timings are three synthetic rounds, not a latency percentile or SLA.",
+    "File and card tool branches retain genuine progress; their final structured content is not token-streamed.",
+    "Image metadata removed; visible faces/text are not automatically redacted."
+  ],
+  "formalCarePosts": 0
+}

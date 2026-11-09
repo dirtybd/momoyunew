@@ -1,0 +1,32 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {createServer} from 'node:http';import {spawn} from 'node:child_process';import {once} from 'node:events';import {mkdtempSync,rmSync} from 'node:fs';import {join} from 'node:path';import {tmpdir} from 'node:os';import sharp from 'sharp';
+
+test('图文帖照片私密暂存、显式确认、归属、去元数据、编辑移除与发布审核',async t=>{
+  let allow=true;const review=createServer(async(req,res)=>{for await(const c of req){}res.setHeader('content-type','application/json');res.end(JSON.stringify({data:{status:'succeeded',outputs:{review_result_json:JSON.stringify({allow,urgent:false,reason:allow?'合成通过':'合成拒绝'})}}}));});review.listen(0,'127.0.0.1');await once(review,'listening');
+  const dir=mkdtempSync(join(tmpdir(),'momoyu-care-media-')),child=spawn(process.execPath,['server/index.mjs'],{windowsHide:true,env:{...process.env,PORT:'0',HOST:'127.0.0.1',DATA_DIR:dir,DIFY_API_KEY:'',DIFY_ENTRYPOINT:'legacy',DIFY_CHATFLOW_API_KEY:'',MATCHING_SCHEDULER:'off',DIFY_MATCHING_BASE_URL:'http://127.0.0.1:'+review.address().port+'/v1',DIFY_MATCHING_API_KEY:'synthetic-review'},stdio:['ignore','pipe','pipe']});
+  t.after(async()=>{if(child.exitCode===null){child.kill();await once(child,'exit');}review.closeAllConnections();await new Promise(r=>review.close(r));rmSync(dir,{recursive:true,force:true});});
+  let base;for await(const c of child.stdout){const m=String(c).match(/"port":(\d+)/);if(m){base='http://127.0.0.1:'+m[1];break;}}assert.ok(base);
+  const call=async(path,method='GET',body,cookie)=>{const r=await fetch(base+'/api'+path,{method,headers:{'content-type':'application/json',...(cookie?{cookie}:{})},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};};
+  const register=async username=>call('/auth/register','POST',{username,password:'Password2026!',displayName:username,department:'合成测试'});
+  const a=await register('photo-owner'),b=await register('photo-reader');
+  const bytes=await sharp({create:{width:120,height:80,channels:3,background:'#ee8b34'}}).jpeg().withMetadata({exif:{IFD0:{Artist:'PRIVATE-QA-NAME'}}}).toBuffer();
+  const upload=async(data=bytes,name='private-person.jpg',cookie=a.cookie)=>{const form=new FormData();form.append('file',new Blob([data]),name);const r=await fetch(base+'/api/care/media',{method:'POST',headers:{cookie},body:form});return {status:r.status,data:await r.json()};};
+  const uploaded=await upload();assert.equal(uploaded.status,201);const photo=uploaded.data.media;
+  assert.ok(!JSON.stringify(photo).includes('private-person'));assert.equal((await fetch(base+photo.url,{headers:{cookie:b.cookie}})).status,404);assert.equal((await fetch(base+photo.url)).status,401);
+  const own=await fetch(base+photo.url,{headers:{cookie:a.cookie}});assert.equal(own.status,200);const meta=await sharp(Buffer.from(await own.arrayBuffer())).metadata();assert.equal(meta.format,'webp');assert.equal(meta.exif,undefined);assert.equal(meta.width,120);
+  assert.equal((await upload(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),'fake.jpg')).status,415);
+  const post={title:'今天的一张照片',content:'',kind:'moment',mediaIds:[photo.id],confirmed:true};
+  assert.equal((await call('/care/posts','POST',{...post,confirmed:false},a.cookie)).status,400);
+  assert.equal((await call('/care/posts','POST',post,b.cookie)).status,404);
+  assert.equal((await call('/care/posts','POST',{...post,mediaIds:[photo.id,photo.id]},a.cookie)).status,400);
+  const created=await call('/care/posts','POST',post,a.cookie);assert.equal(created.status,201);const id=created.data.post.id;assert.equal(created.data.post.photos.length,1);assert.equal(created.data.post.kind,'moment');
+  assert.equal((await fetch(base+photo.url,{headers:{cookie:b.cookie}})).status,200);assert.equal((await call('/care/media/'+photo.id,'DELETE',{},a.cookie)).status,404);
+  const view=await call('/care/posts/'+id,'GET',undefined,b.cookie);assert.equal(view.data.post.anonymous,true);assert.equal(view.data.post.isMine,false);assert.ok(!JSON.stringify(view.data).includes('owner_id'));
+  assert.equal((await call('/care/posts?kind=moment','GET',undefined,b.cookie)).data.items.length,1);assert.equal((await call('/care/posts?kind=unknown','GET',undefined,b.cookie)).status,400);
+  assert.equal((await call('/care/posts/'+id,'PATCH',{mediaIds:[],confirmed:true},a.cookie)).status,400,'图和文不能同时为空');
+  const edited=await call('/care/posts/'+id,'PATCH',{content:'改为文字分享。',mediaIds:[],confirmed:true},a.cookie);assert.equal(edited.status,200);assert.equal(edited.data.post.photos.length,0);assert.equal((await fetch(base+photo.url,{headers:{cookie:b.cookie}})).status,404);
+  assert.ok((await call('/care/media','GET',undefined,a.cookie)).data.items.some(x=>x.id===photo.id));
+  allow=false;assert.equal((await call('/care/posts','POST',post,a.cookie)).status,422);assert.equal((await fetch(base+photo.url,{headers:{cookie:b.cookie}})).status,404);allow=true;
+  const again=await call('/care/posts','POST',post,a.cookie);assert.equal(again.status,201);
+  assert.equal((await call('/care/posts/'+again.data.post.id+'/archive','POST',{confirmed:true},a.cookie)).status,200);assert.equal((await fetch(base+photo.url,{headers:{cookie:b.cookie}})).status,404);assert.equal((await fetch(base+photo.url,{headers:{cookie:a.cookie}})).status,200);
+  const unused=(await upload()).data.media;assert.equal((await call('/care/media/'+unused.id,'DELETE',{},b.cookie)).status,404);assert.equal((await call('/care/media/'+unused.id,'DELETE',{},a.cookie)).status,200);assert.equal((await fetch(base+unused.url,{headers:{cookie:a.cookie}})).status,404);
+});
