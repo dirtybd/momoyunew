@@ -193,7 +193,7 @@ export function parseChatflowPacket(answer) {
 }
 
 async function uploadDifyFile(config,userId,name,mime,bytes,signal) {
-  for(let attempt=1;attempt<=3;attempt++){
+  for(let attempt=1;attempt<=5;attempt++){
     const form=new FormData();form.append('user','momoyu-'+userId);form.append('file',new Blob([bytes],{type:mime}),name);
     try{
       const response=await fetch(config.base+'/files/upload',{method:'POST',redirect:'error',signal,headers:{Authorization:'Bearer '+config.key,connection:'close'},body:form});
@@ -202,9 +202,9 @@ async function uploadDifyFile(config,userId,name,mime,bytes,signal) {
       if(typeof data.id!=='string'||!/^[a-f0-9-]{36}$/i.test(data.id))throw error('DIFY_FILE_UPLOAD','Dify没有返回有效文件引用。');
       return data.id;
     }catch(e){
-      if(!isTransientNetworkError(e)||attempt===3)throw e;
-      console.warn(`Dify file upload connection interrupted (${e.cause?.code||e.name}); retry ${attempt}/3`);
-      await wait(300*attempt);
+      if(!isTransientNetworkError(e)||attempt===5)throw e;
+      console.warn(`Dify file upload connection interrupted (${e.cause?.code||e.name}); retry ${attempt}/5`);
+      await wait(Math.min(2000,300*2**(attempt-1)));
     }
   }
 }
