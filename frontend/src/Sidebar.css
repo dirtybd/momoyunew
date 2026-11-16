@@ -5,3 +5,6 @@
 /* Account text is its own flexible column, not the former trailing chevron slot. */
 .motion-sidebar .account{display:flex;align-items:center;gap:10px;width:100%;min-width:0;text-align:left}.motion-sidebar .account .account-copy{display:grid;gap:3px;flex:1;min-width:0;margin:0;font-size:14px;line-height:1.4}.motion-sidebar .account-copy b,.motion-sidebar .account-copy small{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.motion-sidebar .account-copy b{font-size:14px;font-weight:600}.motion-sidebar .account-copy small{font-size:13px;margin:0;color:#686158}.motion-sidebar .account .avatar{width:34px;height:34px;flex:0 0 34px;font-size:14px;line-height:1}.motion-sidebar.is-collapsed .account{justify-content:center;padding:12px 0}.motion-sidebar.is-collapsed .account .account-copy{display:none}
 @media(max-width:1000px){.motion-sidebar.is-collapsed .account{justify-content:flex-start;padding:12px 6px}.motion-sidebar.is-collapsed .account .account-copy{display:grid}}
+
+/* Uploaded profile photo fills the account avatar. */
+.motion-sidebar .account .avatar.has-photo{background-size:cover;background-position:center;border-color:#e1b48f}

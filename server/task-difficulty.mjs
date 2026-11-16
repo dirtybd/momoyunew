@@ -30,8 +30,8 @@ export function taskDifficulty({db,config=matchingConfig(),clock=Date.now,isBusy
       const claimed=db.prepare("UPDATE task_difficulty SET status='running',lease_until=? WHERE request_id=? AND input_hash=? AND (status='pending' OR status='running' AND lease_until<=?)").run(clock()+90000,job.request_id,job.input_hash,clock());if(!claimed.changes)continue;
       try{const d=JSON.parse(row.data),value=await scoreTask(d,config),fresh=request(row.id);
         if(!eligible(fresh)||digest(JSON.parse(fresh.data))!==job.input_hash){if(eligible(fresh))enqueue(row.id);else db.prepare("UPDATE task_difficulty SET status='unavailable',score=NULL,reason='' WHERE request_id=? AND input_hash=?").run(row.id,job.input_hash);continue;}
-        db.prepare("UPDATE task_difficulty SET status='scored',score=?,reason=?,scored_at=?,lease_until=0 WHERE request_id=? AND input_hash=?").run(value.score,value.reason,new Date(clock()).toISOString(),row.id,job.input_hash);
-      }catch{const attempts=job.attempts+1,delay=Math.min(3600000,30000*2**Math.min(attempts,7));db.prepare("UPDATE task_difficulty SET status='pending',attempts=?,next_at=?,lease_until=0 WHERE request_id=? AND input_hash=?").run(attempts,clock()+delay+Math.floor(Math.random()*Math.min(15000,delay*.2)),job.request_id,job.input_hash);}
+        db.prepare("UPDATE task_difficulty SET status='scored',score=?,reason=?,scored_at=?,lease_until=0 WHERE request_id=? AND input_hash=? AND status='running'").run(value.score,value.reason,new Date(clock()).toISOString(),row.id,job.input_hash);
+      }catch{const attempts=job.attempts+1,delay=Math.min(3600000,30000*2**Math.min(attempts,7));db.prepare("UPDATE task_difficulty SET status='pending',attempts=?,next_at=?,lease_until=0 WHERE request_id=? AND input_hash=? AND status='running'").run(attempts,clock()+delay+Math.floor(Math.random()*Math.min(15000,delay*.2)),job.request_id,job.input_hash);}
     }}finally{running=false;}
   }
   return {enqueue,enqueueOpen,state,drain};

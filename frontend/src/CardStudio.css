@@ -1,0 +1,138 @@
+/* 互助卡设计：按 A 方案的紧凑侧栏落地。 */
+.assistant-workspace .preview.has-studio{display:flex;flex-direction:column;min-height:0;height:100%;padding:0;overflow:hidden;background:#f8f6f2;border-color:#e4ddd2}
+.assistant-workspace .preview.has-studio>.panel-head{display:none}
+.assistant-workspace.chat-focus:not(.is-card-open)>.preview.has-studio{display:none}
+.card-studio{display:flex;flex-direction:column;min-height:0;height:100%;background:#f8f6f2}
+
+.cs-head{flex:none;display:flex;align-items:center;justify-content:space-between;height:54px;padding:0 12px 0 15px;border-bottom:1px solid #e7e0d5;background:#fbf8f2}
+.cs-title{display:flex;align-items:center;gap:9px;min-width:0}
+.cs-mark{width:27px;height:27px;border-radius:8px;background:#e56516;color:#fff;display:grid;place-items:center;font-size:13px;flex:none;box-shadow:0 2px 5px rgba(160,70,10,.22)}
+.cs-title h2{font-size:13.5px;font-weight:600;line-height:1.25;margin:0}
+.cs-title small{display:block;font-size:10px;color:#948a7d;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs-close{flex:none;width:28px;height:28px;border-radius:6px;border:0;background:transparent;color:#8b8175;font-size:18px;line-height:1;cursor:pointer}
+.cs-close:hover{background:#f1ece4;color:#4a4034}
+
+.cs-body{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;padding:12px 13px 11px;display:flex;flex-direction:column;gap:11px}
+.cs-body>*{flex:none}
+
+.cs-templates{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.cs-templates-label{font-size:9.5px;color:#9a9083;margin-right:2px}
+.cs-template{font:inherit;font-size:10.5px;line-height:21px;padding:0 8px;border:1px solid #e2d8ca;border-radius:5px;background:#fffdfa;color:#6d6357;cursor:pointer}
+.cs-template:hover{border-color:#eec6a6;background:#fff1e4;color:#a9450b}
+.cs-template:disabled{opacity:.55;cursor:not-allowed}
+
+/* 卡片本身就是编辑器：文字直接写在纸面上。 */
+.cs-card{margin:0;padding:0 14px 12px;font-size:12px;box-shadow:0 9px 26px rgba(74,52,28,.13)}
+.cs-card .live-top{padding-top:12px;font-size:10px}
+.cs-meta-left{display:flex;align-items:center;gap:6px;min-width:0}
+.cs-kind{display:inline-flex;align-items:center;font-size:9.5px;line-height:18px;border-radius:9px;padding:0 7px;background:#f8e3d1;color:#a9450b;font-weight:500;white-space:nowrap}
+.cs-dot{width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.45;flex:none}
+.cs-tags{justify-content:flex-start;gap:5px;flex-wrap:wrap}
+.cs-tag{display:inline-flex;align-items:center;font-size:9.5px;line-height:18px;padding:0 6px;border-radius:4px;background:#f3eee5;color:#6f6255;white-space:nowrap}
+.cs-tag.accent{background:#f8e3d1;color:#a9450b}
+.cs-tag.mint{background:#e3efe8;color:#3f6856}
+.cs-tag.muted{background:#f3eee5;color:#948a7d}
+.cs-card.card-artwork::before{height:92px;aspect-ratio:auto;margin:-1px -15px 11px}
+.cs-card .live-bottom{margin-top:9px;padding-top:8px;font-size:10px}
+.cs-card-field{display:block;min-width:0;margin-top:8px}
+.cs-card-field>span{display:block;font-size:9.5px;line-height:1.4;color:var(--card-muted);opacity:.82;margin-bottom:1px}
+.cs-card-field textarea{display:block;width:100%;min-width:0;border:0;border-bottom:1px solid transparent;border-radius:3px;background:transparent;color:var(--card-ink);font:inherit;font-size:11px;line-height:1.55;padding:2px 1px 3px;resize:none;overflow:hidden;field-sizing:content}
+.cs-card-field textarea::placeholder{color:var(--card-muted);opacity:.5}
+.cs-card-field textarea:hover{border-bottom-color:var(--card-border,#e8e0d6)}
+.cs-card-field textarea:focus{outline:none;border-bottom-color:var(--card-accent,#b94e0d);background:color-mix(in srgb,currentColor 5%,transparent)}
+.cs-card-title textarea{font-size:13.5px;font-weight:600;line-height:1.4}
+.cs-card-details{margin-top:10px;border-top:1px solid var(--card-border,#e8e0d6);padding-top:7px}
+.cs-card-details summary{display:flex;align-items:center;justify-content:space-between;gap:8px;list-style:none;font-size:10px;color:var(--card-muted);cursor:pointer}
+.cs-card-details summary::-webkit-details-marker{display:none}
+.cs-card-details summary b{font-weight:500;color:var(--card-ink)}
+.cs-card-details-body{padding-top:2px}
+
+.cs-files{display:flex;align-items:flex-start;gap:7px;flex-wrap:wrap;background:#fffdfa;border:1px solid #ebe3d7;border-radius:7px;padding:7px 9px}
+.cs-files-label{flex:none;font-size:9.5px;color:#948a7d;padding-top:3px}
+.cs-file-list{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:5px}
+.cs-file{display:flex;align-items:center;gap:5px;max-width:100%;border:0;border-radius:5px;background:#faf6ee;padding:3px 6px;text-align:left;cursor:pointer}
+.cs-file i{flex:none;width:13px;height:15px;border:1px solid #d3c6b5;border-radius:2px;background:#fff;position:relative}
+.cs-file i:after{content:'';position:absolute;inset:3px 2px auto;height:1px;background:#d3c6b5;box-shadow:0 3px 0 #d3c6b5}
+.cs-file span{min-width:0}
+.cs-file b{display:block;font-size:9.5px;font-weight:500;color:#5a4f42;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+.cs-file small{display:block;font-size:8.5px;color:#9a9083;margin-top:1px}
+.cs-files-more{align-self:center;border:0;background:none;padding:2px 0;font:inherit;font-size:9.5px;color:#a3450d;cursor:pointer}
+
+.cs-complete{display:flex;align-items:center;gap:8px;background:#fffdfa;border:1px solid #ebe3d7;border-radius:7px;padding:7px 9px;font-size:10px;color:#857a6c}
+.cs-complete>i{flex:1;height:4px;border-radius:2px;background:#eee7db;overflow:hidden;margin:0 2px}
+.cs-complete>i>b{display:block;height:100%;border-radius:2px;background:#e56516;transition:width .2s ease}
+.cs-complete strong{font-size:10px;font-weight:500;color:#4a7a5d;white-space:nowrap}
+.cs-complete strong.warn{color:#a9450b}
+
+/* 外观：配色和形状都做成一行，点一下立即生效。 */
+.cs-style-card{background:#fffdfa;border:1px solid #ebe3d7;border-radius:8px;padding:7px 10px 9px;display:flex;flex-direction:column;gap:2px}
+.cs-style-row{display:flex;align-items:center;gap:8px;min-height:30px;min-width:0;flex-wrap:wrap}
+.cs-style-row+.cs-style-row{border-top:1px solid #f4eee6}
+.cs-label{flex:none;width:30px;font-size:10px;color:#948a7d}
+.cs-value{margin-left:auto;font-size:10px;color:#9a9083;white-space:nowrap}
+.cs-swatches{display:flex;align-items:center;gap:6px}
+.cs-swatch{width:18px;height:18px;padding:0;border:1px solid rgba(74,52,28,.12);border-radius:50%;background:var(--swatch);cursor:pointer}
+.cs-swatch.on{box-shadow:0 0 0 2px #fffdfa,0 0 0 3.5px #e56516}
+.cs-shapes{display:flex;align-items:center;gap:6px}
+.cs-shape{width:27px;height:21px;padding:0;display:grid;place-items:center;border:1px solid #ddd3c6;border-radius:5px;background:#fff;cursor:pointer}
+.cs-shape i{display:block;width:14px;height:9px;border:1.4px solid #8a7c6c;border-radius:3px;background:#fff}
+.cs-shape.ticket i{border-radius:2px;border-left:2px dashed #b9ad9e;border-right:2px dashed #b9ad9e}
+.cs-shape.polaroid i{height:10px;border-radius:1px;border-bottom-width:4px;border-bottom-color:#c9bbaa}
+.cs-shape.bubble i{border-radius:8px 8px 8px 1px}
+.cs-shape:hover{border-color:#cbbcaa}
+.cs-shape.on{border-color:#e4b892;background:#fff7ee;box-shadow:inset 0 0 0 1px #f2d2b7}
+.cs-shape.on i{border-color:#c0561a;border-bottom-color:#e0a173}
+.cs-cover-actions{flex:none}
+.cs-cover-actions .file-picker .secondary{min-height:24px;padding:0 8px;border:1px solid #e6bf9f;border-radius:5px;background:#fffdfa;color:#a3450d;font-size:10.5px;font-weight:500}
+.cs-cover-actions .file-picker .secondary:hover{background:#fff1e4;border-color:#e0a173}
+.cs-cover-preview{flex:none;width:36px;height:23px;border:1px dashed #d8ccbc;border-radius:4px;background:#faf6ee;display:grid;place-items:center;overflow:hidden}
+.cs-cover-preview.has{border-style:solid;border-color:#e2d8ca}
+.cs-cover-preview img{width:100%;height:100%;object-fit:cover}
+.cs-cover-preview i{width:13px;height:10px;border:1px solid #c9bbaa;border-radius:2px;position:relative}
+.cs-cover-preview i:after{content:'';position:absolute;left:2px;bottom:1px;width:4px;height:4px;border-radius:50%;background:#c9bbaa}
+.cs-focus{display:flex;align-items:center;gap:5px;font-size:10px;color:#8b8175}
+.cs-focus select{font:inherit;font-size:10px;padding:2px 4px;border:1px solid #e2d8ca;border-radius:4px;background:#fff;color:#5a4f42}
+.cs-remove{border:0;background:none;padding:2px 0;font:inherit;font-size:10px;color:#a3450d;cursor:pointer}
+
+.cs-more{background:#fffdfa;border:1px solid #ebe3d7;border-radius:8px;overflow:hidden}
+.cs-more summary{display:flex;align-items:center;justify-content:space-between;padding:9px 11px;font-size:11px;color:#6b6155;cursor:pointer;list-style:none}
+.cs-more summary::-webkit-details-marker{display:none}
+.cs-more summary:after{content:'⌄';font-size:11px;color:#b0a698;transition:transform .15s ease}
+.cs-more[open] summary:after{transform:rotate(180deg)}
+.cs-more-body{padding:0 11px 11px;display:grid;gap:12px}
+.cs-more-group{display:grid;gap:8px;border-top:1px solid #f4eee6;padding-top:9px}
+.cs-more-group>b{font-size:10px;font-weight:600;color:#5a4f42}
+.cs-more-group .cs-style-row{min-height:26px}
+.cs-more-group .cs-style-row+.cs-style-row{border-top:0}
+
+.cs-field{display:block;min-width:0}
+.cs-field>span{display:block;font-size:9.5px;color:#948a7d;margin-bottom:1px}
+.cs-field textarea{display:block;width:100%;border:0;border-bottom:1px solid #eee7db;background:transparent;padding:3px 1px 5px;font:inherit;font-size:11.5px;line-height:1.6;color:#2d251d;resize:none;overflow:hidden;field-sizing:content}
+.cs-field textarea:focus{outline:none;border-bottom-color:#e56516}
+.cs-field textarea::placeholder{color:#b0a698}
+.cs-select{display:flex;align-items:center;gap:8px;font-size:10.5px;color:#6b6155}
+.cs-select select{flex:1;min-width:0;font:inherit;font-size:10.5px;padding:4px 6px;border:1px solid #ddd3c6;border-radius:5px;background:#fff;color:#332b25}
+.cs-check{display:flex;align-items:flex-start;gap:6px;font-size:10.5px;line-height:1.5;color:#5a4f42}
+.cs-check input{margin-top:2px;accent-color:#b85113}
+.cs-reward{display:block;width:100%;border:0;border-bottom:1px solid #eee7db;background:transparent;padding:3px 1px 6px;font:inherit;font-size:11.5px;line-height:1.6;color:#2d251d;resize:none}
+.cs-reward:focus{outline:none;border-bottom-color:#e56516}
+.cs-reward::placeholder{color:#b0a698}
+.cs-reward-image{display:block;max-width:100%;max-height:86px;border-radius:6px;border:1px solid #e2d8ca;object-fit:cover}
+.cs-cover-tools{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.cs-cover-tools .file-picker .secondary{min-height:26px;padding:3px 8px;font-size:10.5px}
+.cs-cover-tools .text-button{font-size:10.5px}
+.cs-archive{justify-self:start;font-size:10.5px}
+.cs-chips{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.cs-chips button{font:inherit;font-size:10px;line-height:19px;padding:0 7px;border:1px solid #e2d8ca;border-radius:5px;background:#fffdfa;color:#6d6357;cursor:pointer}
+.cs-chips button:hover{border-color:#cbbcaa}
+.cs-chips button.on{border-color:#eec6a6;background:#fff1e4;color:#a9450b;font-weight:500}
+.cs-chips button:disabled{opacity:.45;cursor:not-allowed}
+
+.cs-hint{font-size:10px;line-height:1.55;color:#9a9083;margin:0}
+
+.cs-foot{flex:none;display:flex;align-items:center;gap:7px;padding:10px 12px;border-top:1px solid #e7e0d5;background:#fbf8f2}
+.cs-foot button{min-height:36px;font-size:12.5px;white-space:nowrap}
+.cs-save{flex:0 0 88px}
+.cs-publish{flex:1}
+
+@media(max-width:700px){.assistant-workspace .preview.has-studio{height:auto;max-height:none}.card-studio .cs-body{overflow:visible}.cs-foot{position:sticky;bottom:0}}

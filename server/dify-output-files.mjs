@@ -1,4 +1,5 @@
 import {randomUUID} from 'node:crypto';
+import {difyFileReference} from './dify-file-reference.mjs';
 
 const extensions=/\.(pdf|docx|xlsx|pptx|txt|csv|md|json|xml|png|jpe?g|webp)$/i;
 const fail=message=>{throw new Error(message);};
@@ -51,7 +52,7 @@ export async function downloadOutputFiles({config,links,prefix,signal,onProgress
       if(/\.pdf$/i.test(name)&&bytes.subarray(0,5).toString()!=='%PDF-')fail('PDF格式无效');
       if(/\.(docx|xlsx|pptx)$/i.test(name)&&!bytes.subarray(0,4).equals(Buffer.from([80,75,3,4])))fail('Office格式无效');
       total+=size;
-      outputs.push({name,bytes,mime:response.headers.get('content-type')||'application/octet-stream',nativeReference:'dify-file-ref:'+Buffer.from(JSON.stringify({record_id:match[1]})).toString('base64url'),sourceUrl:raw});
+      outputs.push({name,bytes,mime:response.headers.get('content-type')||'application/octet-stream',nativeReference:difyFileReference(match[1]),sourceUrl:raw});
     }catch(e){if(signal?.aborted)throw e;warnings.push('有结果文件未能安全接回，请让助手重新生成或重试。');}
   }
   if(unrelated&&!outputs.length)warnings.push('本轮没有可接回的结果文件，请让助手重新生成或重试。');

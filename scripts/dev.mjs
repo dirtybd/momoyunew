@@ -1,11 +1,23 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 try{process.loadEnvFile(new URL('../.env',import.meta.url));}catch(e){if(e.code!=='ENOENT')throw e;}
 const autoOpen = process.argv.includes('--open');
 const url = 'http://127.0.0.1:5174/';
+function printLanHint() {
+  if (process.env.MOMOYU_HOST === '127.0.0.1') return;
+  const entries = Object.entries(os.networkInterfaces());
+  const addresses = entries.flatMap(([name, list]) =>
+    (list || []).filter(item => item.family === 'IPv4' && !item.internal).map(item => ({name, address: item.address}))
+  );
+  if (!addresses.length) return;
+  console.log('同一网络内可通过以下地址访问（需已放行本机 5174 端口）：');
+  for (const {name, address} of addresses) console.log(`  http://${address}:5174/  (${name})`);
+}
+printLanHint();
 async function ready() {
   try {
     const [health, page] = await Promise.all([

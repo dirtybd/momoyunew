@@ -26,6 +26,7 @@ test('文件只取实际工具事件，拒绝跨轮、伪文件、重定向和�
   assert.deepEqual([...collectOutputLinks('<output>\n'+JSON.stringify({public_download_url:link}).replaceAll('&','\\u0026')+'\n</output>')],[link]);
   const stream=await readDifyStream(new Response(frame({event:'message',answer:JSON.stringify({public_download_url:link}),conversation_id:'x'})+frame({event:'message_end'}),{headers:{'Content-Type':'text/event-stream'}}));assert.equal(stream.outputLinks.size,0,'最终JSON不能伪造工具文件');
   const good=await downloadOutputFiles({config,links:new Set([link]),prefix});assert.equal(good.outputs.length,1);assert.equal(good.outputs[0].name,'结果.pdf');assert.deepEqual(good.outputs[0].bytes,bytes);
+  assert.equal(good.outputs[0].nativeReference,'dify-file-ref:'+Buffer.from(JSON.stringify({record_id:id})).toString('base64'),'结果续改引用保留Python urlsafe_b64decode要求的填充');
   const mixed=await downloadOutputFiles({config,links:new Set([link,link.replace(id,probeId)]),prefix});assert.equal(mixed.outputs.length,1);assert.deepEqual(mixed.warnings,[],'探测文件不冒充结果，也不误报有效结果失败');
   assert.equal((await downloadOutputFiles({config,links:new Set([link,link.replace('timestamp=1','timestamp=2')]),prefix})).outputs.length,1,'同一工具文件只保存一次');
   for(mode of ['wrong','invalid','large','redirect'])assert.equal((await downloadOutputFiles({config,links:new Set([link]),prefix})).outputs.length,0,mode);

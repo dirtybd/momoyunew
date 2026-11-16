@@ -134,12 +134,13 @@
             "desc": "",
             "selected": false,
             "model": {
-              "provider": "langgenius/opencode_go/opencode_go",
-              "name": "deepseek-v4.1-flash",
+              "provider": "langgenius/openai_api_compatible/openai_api_compatible",
+              "name": "momoyu-card-qwen-fast-20261113",
               "mode": "chat",
               "completion_params": {
                 "temperature": 0.1,
-                "max_tokens": 16384
+                "max_tokens": 16384,
+                "enable_thinking": false
               }
             },
             "prompt_template": [

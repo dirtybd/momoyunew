@@ -9,9 +9,10 @@ import {
 import { mkdirSync, readFileSync, statSync, realpathSync } from "node:fs";
 import { resolve, extname, sep } from "node:path";
 import { CARD_STYLE_OPTIONS, DEFAULT_CARD_STYLE, isCardStyle, normalizeCardStyle } from "../shared/card-style.mjs";
+import { DEFAULT_CARD_BACKGROUND, matchBackgroundText, matchCardBackground } from "../shared/card-backgrounds.mjs";
 import { DEMO_REQUESTS } from "../shared/demo-requests.mjs";
 import { difyConfig, clarifyWithDify } from './dify.mjs';
-import {attachmentStore,uploadedBackgroundRequested} from './attachments.mjs';
+import {attachmentStore,uploadedBackgroundRequested,usesPreviousMaterials} from './attachments.mjs';
 import {taskWorkflow} from './task-workflow.mjs';
 import {careService} from './care.mjs';
 import {matchingService,defaultPreferences,validatePreferences,verifyMatchToken} from './matching.mjs';
@@ -19,11 +20,27 @@ import {accountSchema,accountAccess,requirePublishing} from './accounts.mjs';
 import {adminService} from './admin.mjs';
 import {officialMediaStore} from './official-media.mjs';
 import {taskPoints} from './task-points.mjs';
+import {profileService} from './profile.mjs';
 import {taskDifficulty} from './task-difficulty.mjs';
 import {DIFFICULTY_REWARD_POLICY} from '../shared/task-limits.mjs';
 import {createAgentCatalog} from './agent-catalog.mjs';
+import {purgeExpiredArchives} from './archive-cleanup.mjs';
+import {engagementService} from './engagement.mjs';
+import {createFeedbackMailer} from './mailer.mjs';
+import {createFeedbackNotifier} from './notifier.mjs';
+import {feedbackService} from './feedback.mjs';
+import {detectTargetLanguage,inferTargetLanguages,translateProjectTextWorkbook,translationConfig} from './electrical-translation.mjs';
+import {askElectricalAgent,electricalAgentConfig,parseCapabilityCommand,stripCapabilityCommand} from './electrical-agent.mjs';
+import {isTranslationRequest,looksLikeCardRequest,suggestRoute} from './intent-routing.mjs';
+import {classifyTranslationTask,translationSummary} from './translation-routing.mjs';
+import {translatePlainText,resumePlainTranslationMessage} from './plain-text-translation.mjs';
+import {translateDocuments} from './document-translation.mjs';
+import {prepareDocumentReading} from './document-reading.mjs';
+import {initialCardClarification,CARD_INTAKE_REPLY} from './card-intake.mjs';
 
 const remoteConfig = difyConfig();
+const electricalTranslationConfig = translationConfig();
+const electricalAgent = electricalAgentConfig();
 if(process.env.CARD_TOOL_SECRET&&process.env.CARD_TOOL_SECRET.length<32)throw new Error('CARD_TOOL_SECRET 需要至少32字符');
 const activeClarifications = new Set();
 
@@ -69,10 +86,15 @@ const messageViews=id=>all('SELECT rowid,role,content,intent,meta FROM messages 
   const files=attachments.messageFiles(m.rowid);
   let meta=null;try{meta=m.meta?JSON.parse(m.meta):null;}catch{}
   const recommendations=Array.isArray(meta?.recommendations)&&meta.recommendations.length?meta.recommendations:null;
-  return {role:m.role,content:m.content,...(recommendations?{recommendations}:{}),...(files.length?{files}:{})};
+  const sent=m.role==='user'&&Array.isArray(meta?.attachments)?meta.attachments.map(f=>({...f,...(!attachments.get(f.id)?{unavailable:true}:{})})):[];
+  return {role:m.role,content:m.content,...(m.intent?{intent:m.intent}:{}),...(sent.length?{attachments:sent}:{}),...(recommendations?{recommendations}:{}),...(files.length?{files}:{})};
 });
 const agentCatalog=createAgentCatalog({dataDir});
 agentCatalog.start();
+const archiveRetentionDays=Math.max(1,Math.min(3650,Number(process.env.ARCHIVE_RETENTION_DAYS)||7));
+const purgeArchives=()=>{try{const result=purgeExpiredArchives({db,dataDir,retentionDays:archiveRetentionDays,isBusy:()=>activeClarifications.size>0});if(result.deleted)console.log('Archived drafts purged:',JSON.stringify(result));}catch(e){console.error('Archived draft cleanup failed:',e);}};
+purgeArchives();
+setInterval(purgeArchives,6*60*60*1000).unref();
 const now = () => new Date().toISOString();
 const base = () => ({
   title: "",
@@ -91,6 +113,7 @@ const base = () => ({
   visibility: "company",
   fallbackToBoard: false,
   cardStyle: { ...DEFAULT_CARD_STYLE },
+  detailLayout: "auto",
   source: "employee",
   kind: "request",
   status: "draft",
@@ -119,6 +142,7 @@ const fields = [
   "visibility",
   "fallbackToBoard",
   "cardStyle",
+  "detailLayout",
 ];
 const profileFields = [
   "displayName",
@@ -147,6 +171,8 @@ class HttpError extends Error {
 const fail = (status, code, message) => {
   throw new HttpError(status, code, message);
 };
+const engagement = engagementService({db,get,all,run,body,json,fail});
+engagement.ensure();
 function validCardStyle(value) {
   return value && typeof value === 'object' && !Array.isArray(value) &&
     Object.keys(value).every(key => Object.hasOwn(CARD_STYLE_OPTIONS, key)) && isCardStyle(value);
@@ -159,8 +185,13 @@ function validate(obj, allowed) {
       fail(400, "INVALID_FIELD", `不允许字段：${key}`);
     if (key === "cardStyle") {
       if (!validCardStyle(value)) fail(400, "INVALID_FIELD", "卡片样式无效");
+    } else if (key === "detailLayout") {
+      if (!["auto", "dossier", "pinboard", "chat"].includes(value))
+        fail(400, "INVALID_FIELD", "详情版式无效");
     } else if(key==='helpPreferences'){
       validatePreferences(value);
+    } else if(key==='attachmentIds'){
+      if(!Array.isArray(value)||value.length>100||new Set(value).size!==value.length||value.some(v=>typeof v!=='string'||!/^[-a-f0-9]{36}$/i.test(v)))fail(400,'INVALID_FIELD','请选择本轮有效附件，最多100个');
     } else if (arrayFields.includes(key)) {
       if (
         !Array.isArray(value) ||
@@ -216,9 +247,11 @@ function card(row, user) {
     get("SELECT profile FROM users WHERE id=?", row.claimer_id);
   return {
     id: row.id,
-    ...Object.fromEntries(Object.entries(d).filter(([key])=>!["carePreview","careSafety","careMode"].includes(key))),
+    ...Object.fromEntries(Object.entries(d).filter(([key])=>!["carePreview","careSafety","careMode","backgroundAuto","backgroundChosen"].includes(key))),
     ...(mine?{carePreview:d.careSafety==="urgent"?null:(d.carePreview||null),careSafety:d.careSafety||"support",careMode:!!d.careMode}:{}),
     cardStyle: normalizeCardStyle(d.cardStyle),
+    detailLayout: d.detailLayout || "auto",
+    viewCount: engagement.viewCount(row.id),
     cardArtwork:d.cardArtwork?{id:d.cardArtwork.id,design:Object.fromEntries(['name','paper','ink','accent','accentInk','shape','layout'].map(k=>[k,d.cardArtwork.design[k]]))}:null,
     materials: d.anonymous && !mine && row.claimer_id!==user?.id ? [] : d.materials,
     owner: ownerProfile
@@ -312,12 +345,14 @@ function styleText(message) {
 function styleRequested(message) {
   message = styleText(message);
   if (/(?:怎么|如何|什么是|[?？])/.test(message) && !/(?:改|换|设置|设为|变成|去掉|移除)/.test(message)) return false;
+  if (/(?:背景|底图|封面图)/.test(message) && /(?:改|换|设置|设为|变成|做成|去掉|移除|纯色|不要)/.test(message)) return true;
   if (/(?:山景|山峰|海边|海岸|表情包|摸鱼表情|纯色|票根|车票|拍立得|照片框|气泡|对话框|标准轮廓)/.test(message) &&
       /(?:改|换|设置|设为|变成|做成|去掉|移除|用.*(?:做|作|当).*背景)/.test(message)) return true;
   return /(?:卡片|这张卡|需求卡|卡的样式|样式|外观|配色|颜色|背景|布局|圆角|字体|色调|橙色|橘色|orange|深蓝|藏蓝|蓝色|绿色|粉色|黑色|米色|沙色|墨色|玫瑰|薄荷|海报|便签|直角|方角|加粗)/i.test(message) && /(?:改|换|调整|设置|设为|变|用|成|风格|样式)/.test(message);
 }
 function localStyle(d, message) {
   const style = normalizeCardStyle(d.cardStyle);
+  const previousBackground = style.background;
   for (const [pattern, key, value] of [
     [/橙色|橘色|orange/i,'theme','orange'], [/薄荷|绿色|绿/,'theme','mint'], [/沙色|米色/,'theme','sand'], [/玫瑰|粉色|粉/,'theme','rose'], [/天空|蓝色|蓝/,'theme','sky'], [/深蓝|藏蓝|墨色|黑色|深色/,'theme','ink'],
     [/海报/,'layout','poster'], [/便签/,'layout','note'], [/标准布局|标准样式/,'layout','standard'],
@@ -325,6 +360,15 @@ function localStyle(d, message) {
     [/山景|山峰/,'background','mountain'], [/海边|海岸/,'background','coast'], [/表情包|摸鱼表情/,'background','meme'], [/去掉背景图|去掉背景|移除背景|纯色/,'background','none'],
     [/直角|方角/,'radius','square'], [/圆角/,'radius','soft'], [/加粗|醒目/,'emphasis','bold'], [/正常字重|普通字重/,'emphasis','normal']
   ]) if (pattern.test(message)) style[key] = value;
+  if (/(?:背景|底图|封面图)/.test(message)) {
+    const matched = /(?:互助|通用)/.test(message) ? DEFAULT_CARD_BACKGROUND : matchBackgroundText(message);
+    if (/(?:去掉|移除|不要|纯色|无背景)/.test(message)) style.background = 'none';
+    else if (matched) style.background = matched;
+  }
+  if (style.background !== previousBackground) {
+    d.backgroundChosen = true;
+    d.backgroundAuto = false;
+  }
   d.cardStyle = style;
   return {intent:'style', ready: false, reply:'本地引导已按可识别的关键词调整卡片样式；未调用 AI。可用颜色、布局、圆角、字重、背景图和形状关键词描述调整。'};
 }
@@ -333,9 +377,15 @@ function clarify(d, message) {
   if (/(?:压力大|心情低落|难过|焦虑|情绪不好|很崩溃|想倾诉)/.test(message) && !/(?:帮我|请).{0,8}(?:写|翻译|润色|计算)/.test(message)) return {intent:'care',careSafety:'support',careCard:null,ready:false,reply:'听起来这段时间不容易。你可以按自己的节奏说说，也可以先做一件让自己稍微舒服一点的小事。这里是本地引导，未连接 AI。'};
   const labeled = message.split(/[\n；;]/).some(line => labelPattern.test(line.trim()));
   const collaboration = labeled || /(?:互助|找人|请人|帮忙完成|协作|发布需求)/.test(message);
+  const backgroundLabelOnly = () => {
+    if (!/(?:背景|底图|封面图)/.test(message)) return false;
+    if (/(?:设计|做|创建|新建|发布|整理).{0,8}(?:卡|需求)/.test(message)) return false;
+    const rest = message.replace(/(?:背景|底图|封面图|互助|通用|审阅|审核|翻译)/g, '');
+    return !/(?:互助|找人|请人|帮忙完成|协作|发布需求)/.test(rest);
+  };
   if (styleRequested(message)) {
     const style = localStyle(d, styleText(message));
-    if (!collaboration) return style;
+    if (!collaboration || backgroundLabelOnly()) return style;
   }
   if (!labeled && !collaboration && /[?？]|怎么|如何|什么是|解释一下|计算|excel.*(?:公式|函数)|(?:帮我|请|麻烦).{0,8}(?:写|翻译|润色|计算)/i.test(message)) {
     return {intent:'help', ready:false, reply:'当前是本地引导模式，未连接 AI，无法直接回答这个问题。配置 Dify 后可以继续办公问答；如需同事协作，也可以明确提出互助需求。'};
@@ -398,7 +448,62 @@ function clarify(d, message) {
 const workflow=taskWorkflow({db,files:attachments,body,json,card,save,base,activeClarifications,points,difficulty,wakeBackground});
 const care=careService({db,body,json,dataDir});
 const officialMedia=officialMediaStore({db,dataDir,json});
+const profileApi=profileService({dataDir,get,run,json,points,userView});
 const admin=adminService({db,body,json,base,save,matching,activeClarifications,officialMedia,points,difficulty,wakeBackground});
+const feedbackMailer=createFeedbackMailer();
+const feedbackNotifier=createFeedbackNotifier();
+const feedback=feedbackService({db,body,json,mailer:feedbackMailer,notifier:feedbackNotifier});
+
+// TIA project text is a file type, not a request wording. `classifyTranslationTask`
+// has already decided that these are `User Texts` workbooks and that the user
+// explicitly asked for translation. Ordinary Word/PDF/TXT/Excel files are not
+// handled here; they go to the office (file) assistant as a whole-document or
+// requested-scope translation.
+// The target language is read from the sheet headers when the user did not
+// name one and exactly one editable column is still empty.
+async function translateProjectTexts(candidates,message,onProgress){
+  const explicitTarget=detectTargetLanguage(message);
+  const fileList=candidates.map(item=>item.file.name).join('、');
+  const inspections=candidates.map(({file,classification})=>{
+    const headers=classification.analysis
+      ?inferTargetLanguages(classification.analysis)
+      :{editable:[],missing:[]};
+    return {file,headers,error:classification.analysis?null:classification.error};
+  });
+  let targetLanguage=explicitTarget;
+  if(!targetLanguage){
+    // Headers are the authority: a filled source column plus one empty target
+    // column identifies the target without asking. Multiple empty columns are
+    // genuinely ambiguous, so ask instead of guessing.
+    const missing=[...new Set(inspections.flatMap(item=>item.headers.missing))];
+    if(missing.length===1)targetLanguage=missing[0];
+    else{
+      const details=inspections.map(item=>`- ${item.file.name}：可用语言列 ${item.headers.editable.join('、')||'未识别'}${item.headers.missing.length?`；待翻译列 ${item.headers.missing.join('、')}`:''}`).join('\n');
+      return {intent:'help',ready:false,suppressRecommendations:true,conversations:[],outputFiles:[],reply:
+        `这份博图/TIA 项目文本工作簿（${fileList}）无法从表头确定唯一的目标语言。\n${details}\n请说明要翻译成哪种语言，例如“翻译成英文”或“目标语言：de-DE”。`};
+    }
+  }
+  if(!electricalTranslationConfig){
+    return {intent:'help',ready:false,suppressRecommendations:true,conversations:[],outputFiles:[],reply:
+      `项目文本翻译服务尚未配置（DIFY_TRANSLATION_API_KEY）：${fileList} 暂时不能翻译，请联系管理员。`};
+  }
+  const outputs=[],notes=[],errors=[];
+  for(const {file,classification} of candidates){
+    if(classification.error&&!classification.analysis){errors.push(`${file.name}：${classification.error.message}`);continue;}
+    try{
+      const translated=await translateProjectTextWorkbook({name:file.name,bytes:file.bytes,targetLanguage,config:electricalTranslationConfig,onProgress});
+      outputs.push({name:translated.name,mime:translated.mime,bytes:translated.bytes,nativeReference:'electrical-project-text'});
+      const stats=translated.stats;
+      notes.push(`- ${file.name}：翻译 ${stats.translated} 条，去重后 ${stats.uniqueRequests} 条请求，${stats.batches} 批；已有 ${stats.existingUntranslated} 条译文未覆盖；输出 ${translated.name}${stats.skipped?`；本次上限外仍有 ${stats.skipped} 条未处理，可再次上传继续`:''}`);
+    }catch(error){errors.push(`${file.name}：${error.message}`);}
+  }
+  const header=explicitTarget
+    ?`博图/TIA 项目文本已按 ${targetLanguage} 处理。`
+    :`博图/TIA 项目文本已按表头目标语言 ${targetLanguage} 处理。`;
+  const body=notes.length?`\n\n${notes.join('\n')}`:'';
+  const errorText=errors.length?`\n\n未完成：\n${errors.map(item=>`- ${item}`).join('\n')}`:'';
+  return {intent:'help',ready:false,suppressRecommendations:true,conversations:[],outputFiles:outputs,reply:header+body+errorText};
+}
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://localhost"),
@@ -411,7 +516,7 @@ const server = createServer(async (req, res) => {
       const origin = req.headers.origin;
       if (origin && origin !== `http://${req.headers.host}`)
         fail(403, "INVALID_ORIGIN", "请求来源不被允许");
-      const multipartUpload=req.method==='POST'&&(/^\/api\/requests\/[^/]+\/attachments$/.test(path)||path==='/api/care/media'||path==='/api/admin/official/media')&&/^multipart\/form-data;/.test(req.headers['content-type']||'');
+      const multipartUpload=req.method==='POST'&&(/^\/api\/requests\/[^/]+\/attachments$/.test(path)||path==='/api/care/media'||path==='/api/admin/official/media'||path==='/api/profile/avatar')&&/^multipart\/form-data;/.test(req.headers['content-type']||'');
       if (!multipartUpload&&
         !/^application\/json(?:\s*;|\s*$)/i.test(
           req.headers["content-type"] || "",
@@ -420,8 +525,10 @@ const server = createServer(async (req, res) => {
         fail(415, "JSON_REQUIRED", "请使用 application/json");
     }
     const user = auth(req);
+    if(await profileApi.handle(req,res,url,user))return;
     if(await officialMedia.handle(req,res,url,user))return;
     if(await admin.handle(req,res,url,user))return;
+    if(await feedback.handle(req,res,url,user))return;
     if(path==='/api/internal/match-preview'&&method==='POST'){
       const b=await body(req);validate(b,['match_token','card_json']);const scope=verifyMatchToken(b.match_token,process.env.CARD_TOOL_SECRET);
       if(!scope)fail(403,'INVALID_MATCH_TOKEN','预匹配授权已过期或无效');
@@ -446,8 +553,9 @@ const server = createServer(async (req, res) => {
     }
     if(path==='/api/leaderboard'&&method==='GET'){requireUser(user);return json(res,200,points.leaderboard(user.id,url.searchParams.get('period')||'month'));}
     if(path==='/api/me/task-limits'&&method==='GET'){requireUser(user);return json(res,200,points.capacity(user.id));}
+    if(await engagement.handle(req,res,path,method,user))return;
     if(await care.handle(req,res,url,user))return;
-    if(await workflow.handle(req,res,path,user))return;
+    if(await workflow.handle(req,res,path,user,url))return;
     const agentIcon=path.match(/^\/api\/agents\/(product-[a-z0-9]+)\/icon$/i);
     if(agentIcon&&method==='GET'){
       const icon=agentCatalog.icon(agentIcon[1]);
@@ -472,6 +580,7 @@ const server = createServer(async (req, res) => {
         difyConfigured: !!remoteConfig,
         difyEntrypoint:remoteConfig?(remoteConfig.kind||'legacy'):'local',
         matchingMode:matching.config?'dify':'local',
+        archiveRetentionDays,
         agentCatalog:agentCatalog.status(),
       });
     if (path === "/api/session" && method === "GET")
@@ -628,7 +737,7 @@ const server = createServer(async (req, res) => {
     if (path === "/api/clarify" && method === "POST") {
       requireUser(user);
       const b = await body(req);
-      validate(b, ["requestId", "message", "entryMode"]);
+      validate(b, ["requestId", "message", "entryMode","attachmentIds"]);
       if(b.entryMode!==undefined&&(b.entryMode!=='care'||b.requestId))fail(400,'INVALID_FIELD','倾诉入口只用于新对话。');
       if (!b.message?.trim()) fail(400, "INVALID_FIELD", "请输入需求");
       let row = b.requestId ? owned(b.requestId, user) : null;
@@ -646,6 +755,13 @@ const server = createServer(async (req, res) => {
       const d = JSON.parse(row.data);
       if(d.deletedAt)fail(409,'ARCHIVED','请先恢复这份草稿。');
       if (d.status !== "draft") fail(409, "NOT_DRAFT", "只能澄清草稿");
+      const previousAttachmentIds=attachments.sentIds(row.id),materialFiles=attachments.list(row.id,'material');
+      const currentAttachmentIds=b.attachmentIds??materialFiles.filter(f=>!previousAttachmentIds.includes(f.id)&&![d.coverFileId,d.rewardFileId].includes(f.id)).map(f=>f.id);
+      for(const id of currentAttachmentIds){const f=attachments.get(id);if(!f||f.request_id!==row.id||f.uploader_id!==user.id||f.role!=='material'||[d.coverFileId,d.rewardFileId].includes(id))fail(400,'INVALID_ATTACHMENT','只能发送这份对话中本人上传的材料附件。');}
+      const inputAttachmentIds=attachments.taskIds(row.id,currentAttachmentIds,b.message);
+      const outputHistory=attachments.taskOutputs(row,user,b.message,currentAttachmentIds);
+      const newFileTask=currentAttachmentIds.some(id=>!previousAttachmentIds.includes(id))&&previousAttachmentIds.length>0&&!usesPreviousMaterials(b.message);
+      const messageAttachments=currentAttachmentIds.filter(id=>!previousAttachmentIds.includes(id)).map(id=>attachments.view(attachments.get(id)));
       if (activeClarifications.has(row.id)) fail(409, 'CLARIFY_BUSY', '这张卡片正在整理中，请等待本轮完成。');
       activeClarifications.add(row.id);
       try {
@@ -658,25 +774,114 @@ const server = createServer(async (req, res) => {
         if(streaming){res.setHeader('Content-Type','text/event-stream; charset=utf-8');res.writeHead(200,{'Cache-Control':'no-store','X-Accel-Buffering':'no'});progress({stage:'thinking',label:'正在理解你的描述'});}
         res.once('close',()=>{if(!res.writableEnded)controller.abort();});
         {
-          if (remoteConfig) {
+          const command=parseCapabilityCommand(b.message);
+          const previousReply=get("SELECT content FROM messages WHERE request_id=? AND role='assistant' ORDER BY rowid DESC LIMIT 1",row.id)?.content;
+          const clarifyMessage=command?(command.query||b.message):resumePlainTranslationMessage(b.message,previousReply);
+          // `/电气` stays the expert entry for questions and knowledge lookup,
+          // but a translation request without a project-text workbook belongs
+          // to the file-processing assistant. A project-text workbook keeps the
+          // dedicated column writer below.
+          let capability=command?.capability;
+          let commandFiles=null;
+          let electricalTranslationTask=null;
+          if(capability==='electrical'&&isTranslationRequest(clarifyMessage)){
+            try{commandFiles=await attachments.aiInputs(row,user,'electrical',{skipImages:true,ids:inputAttachmentIds});}
+            catch{commandFiles=[];}
+            electricalTranslationTask=await classifyTranslationTask({message:clarifyMessage,files:commandFiles});
+            if(!electricalTranslationTask.project.length)capability='office';
+          }
+          const translationRequest=isTranslationRequest(clarifyMessage);
+          const hintedRoute=suggestRoute(clarifyMessage);
+          // The task classifier sometimes reads “设计卡片，用这份表格” as an
+          // office task and historically sent translations to the electrical
+          // expert. Unambiguous card/help phrasing and every explicit
+          // translation request are therefore forced locally.
+          const hasTranslationFiles=workflow.sourceFiles(row,user).some(file=>file.aiEnabled&&inputAttachmentIds.includes(file.id))||outputHistory.length>0;
+          const electricalImageRoute=capability==='electrical'&&remoteConfig?.agentImageReading&&workflow.sourceFiles(row,user).some(file=>file.isImage&&file.aiEnabled&&inputAttachmentIds.includes(file.id)&&![d.coverFileId,d.rewardFileId].includes(file.id));
+          const forceRoute=electricalImageRoute?'electrical':capability==='office'?'office'
+            :capability==='card'?'card'
+              :hintedRoute==='card'?'card'
+                :previousReply===CARD_INTAKE_REPLY&&!command&&!/(?:不|取消|停止).{0,6}(?:发布|发卡|互助|求助|卡片|请求)/.test(clarifyMessage)?'card'
+                :translationRequest&&hasTranslationFiles?'office'
+                  :null;
+          const styleTurn=styleRequested(clarifyMessage);
+          const historyRows=(newFileTask?[]:all('SELECT role,content,intent FROM messages WHERE request_id=? ORDER BY rowid', row.id))
+            .map(item=>({...item,content:stripCapabilityCommand(item.content)||item.content}));
+          const intake=forceRoute==='card'?initialCardClarification(clarifyMessage,{card:d,history:historyRows,attachmentCount:inputAttachmentIds.length,outputCount:outputHistory.length}):null;
+          if(intake){result=intake;}
+          else if(capability==='electrical'&&!electricalImageRoute){
+            let projectResult=null;
+            try{
+              const files=commandFiles||await attachments.aiInputs(row,user,'electrical',{skipImages:true,ids:inputAttachmentIds});
+              const task=electricalTranslationTask||await classifyTranslationTask({message:clarifyMessage,files});
+              projectResult=task.project.length?await translateProjectTexts(task.project,clarifyMessage,progress):null;
+            }catch{}
+            if(projectResult){
+              result=projectResult;
+            }else if(!command?.query){
+              result={intent:'help',ready:false,suppressRecommendations:true,conversations:[],outputFiles:[],reply:'请在 /电气 后面输入问题，例如“/电气 S7-1200 和 S7-1500 有什么区别”。'};
+            }else if(!electricalAgent){
+              result={intent:'help',ready:false,suppressRecommendations:true,conversations:[],outputFiles:[],reply:'电气专家尚未配置服务端密钥（DIFY_ELECTRICAL_API_KEY），请联系管理员。'};
+            }else{
+              const conversation=get('SELECT conversation_id FROM dify_conversations WHERE request_id=? AND scope=?',row.id,'electrical');
+              progress({stage:'thinking',label:'电气专家正在处理'});
+              try{
+                const answer=await askElectricalAgent({config:electricalAgent,userId:user.id,conversationId:conversation?.conversation_id,query:command.query,signal:controller.signal,onProgress:progress});
+                result={intent:'help',ready:false,suppressRecommendations:true,conversations:answer.conversationId?[{scope:'electrical',conversationId:answer.conversationId}]:[],outputFiles:[],reply:answer.reply};
+              }catch(error){
+                if(controller.signal.aborted)fail(499,'CANCELLED','本轮已停止，草稿保持不变。');
+                result={intent:'help',ready:false,suppressRecommendations:true,conversations:[],outputFiles:[],reply:`电气专家暂时不可用：${error.message}`};
+              }
+            }
+            if(controller.signal.aborted)fail(499,'CANCELLED','本轮已停止，草稿保持不变。');
+            if(owned(row.id,user).data!==row.data)fail(409,'DRAFT_CHANGED','这张草稿已在其他页面修改，请重新打开草稿后再发送。');
+          }else if(command && !command.query){
+            result={intent:'help',ready:false,suppressRecommendations:true,conversations:[],outputFiles:[],reply:capability==='electrical'?'请在 /电气 后面说明需要分析的图纸或故障。':capability==='card'?'请在 /卡片 后面说明要创建的互助需求。':'请在 /办公 后面说明需要处理的办公任务。'};
+          }else if (remoteConfig) {
             const conversation = get('SELECT conversation_id FROM dify_conversations WHERE request_id=? AND scope=?', row.id, remoteConfig.scope);
-            const inputFiles=await attachments.aiInputs(row,user,remoteConfig.scope,{skipImages:uploadedBackgroundRequested(b.message)});
-            result = await clarifyWithDify({config: remoteConfig, userId: user.id,
-              conversationId: conversation?.conversation_id, requestId:row.id,card: d, message: b.message,
-              history: all('SELECT role,content,intent FROM messages WHERE request_id=? ORDER BY rowid', row.id),onProgress:progress,onReply:reply,signal:controller.signal,attachments:workflow.sourceFiles(row,user),inputFiles,
+            const backgroundRequested=uploadedBackgroundRequested(clarifyMessage);
+            const inputFiles=await attachments.aiInputs(row,user,remoteConfig.scope,{skipImages:backgroundRequested,ids:inputAttachmentIds});
+            // File-type recognition decides the translation mode before Dify:
+            // `User Texts` workbooks use the local column writer, ordinary
+            // documents go to the office assistant, and unrelated messages are
+            // unaffected. An explicit /卡片 command still wins.
+            const translationTask=await classifyTranslationTask({message:clarifyMessage,files:inputFiles});
+            const documentReading=await prepareDocumentReading({message:clarifyMessage,files:inputFiles,signal:controller.signal,forceRoute});
+            const projectTextResult=forceRoute==='card'?null
+              :translationTask.project.length?await translateProjectTexts(translationTask.project,clarifyMessage,progress):null;
+            if(projectTextResult){
+              result=projectTextResult;
+              if(translationTask.documents.length)result.reply+=`\n\n其余文件（${translationTask.documents.map(file=>file.name).join('、')}）不是博图/TIA 项目文本，本次未按语言列写回；如需整篇或按指定范围翻译，请单独发送并说明要求。`;
+            }else if(documentReading?.error)result={intent:'help',ready:false,suppressRecommendations:true,conversations:[],outputFiles:[],reply:documentReading.error};
+            else result = (forceRoute==='card'?null:await translateDocuments({task:translationTask,message:clarifyMessage,config:electricalTranslationConfig,userId:user.id,signal:controller.signal,onProgress:progress})||await translatePlainText({task:translationTask,message:clarifyMessage,config:electricalTranslationConfig,userId:user.id,signal:controller.signal,onProgress:progress})) || await clarifyWithDify({config: remoteConfig, userId: user.id,
+              conversationId: newFileTask?undefined:conversation?.conversation_id, requestId:row.id,card: d, message: clarifyMessage, forceRoute, suggestedRoute: hintedRoute, backgroundImageRequested:backgroundRequested,
+              history: historyRows,onProgress:progress,onReply:reply,signal:controller.signal,attachments:workflow.sourceFiles(row,user).filter(f=>inputAttachmentIds===undefined||inputAttachmentIds.includes(f.id)),inputFiles,
+              translation:translationSummary(translationTask),documentReading,
               getConversationId:scope=>get('SELECT conversation_id FROM dify_conversations WHERE request_id=? AND scope=?',row.id,scope)?.conversation_id,
-              onFileUploaded:(id,uploadId,scope=remoteConfig.scope)=>attachments.cacheUpload(id,scope,user.id,uploadId),outputHistory:attachments.outputHistory(row,user)});
+              onFileUploaded:(id,uploadId,scope=remoteConfig.scope)=>attachments.cacheUpload(id,scope,user.id,uploadId),fileWasDelivered:(id,scope,conversationId)=>attachments.wasDelivered(row.id,scope,conversationId,id),outputHistory,readLocalOutput:(id,scope)=>attachments.readOutput(id,row,user,scope)});
             if(controller.signal.aborted)fail(499,'CANCELLED','本轮已停止，草稿保持不变。');
             const current = owned(row.id, user);
             if (current.data !== row.data) fail(409, 'DRAFT_CHANGED', '这张草稿已在其他页面修改，请重新打开草稿后再发送。');
             if (result.card) Object.assign(d, result.card);
-            if (['request', 'style'].includes(result.intent) && result.cardStyle && styleRequested(b.message)) d.cardStyle = normalizeCardStyle({...normalizeCardStyle(d.cardStyle), ...result.cardStyle});
-            if(['request','style'].includes(result.intent)&&result.artwork){
+            if (['request', 'style'].includes(result.intent) && result.cardStyle && styleTurn) {
+              const previousBackground = normalizeCardStyle(d.cardStyle).background;
+              d.cardStyle = normalizeCardStyle({...normalizeCardStyle(d.cardStyle), ...result.cardStyle});
+              if (d.cardStyle.background !== previousBackground) {
+                d.backgroundChosen = true;
+                d.backgroundAuto = false;
+              }
+            }
+            if(['request','style'].includes(result.intent)&&result.artwork&&!(backgroundRequested&&result.coverAttachmentId)){
               d.cardArtwork=result.artwork;
               delete d.coverFileId;
               d.cardStyle=normalizeCardStyle({...d.cardStyle,shape:result.artwork.design.shape,layout:result.artwork.design.layout,background:'none'});
             }
-            if(['request','style'].includes(result.intent)&&result.coverAttachmentId&&uploadedBackgroundRequested(b.message))workflow.applyCover(row,d,result.coverAttachmentId,user);
+            if(['request','style'].includes(result.intent)&&result.coverAttachmentId&&backgroundRequested)workflow.applyCover(row,d,result.coverAttachmentId,user);
+            if(result.intent==='request'&&hasCard(d)&&!d.coverFileId&&!d.cardArtwork&&!styleTurn&&!d.backgroundChosen&&(d.backgroundAuto||normalizeCardStyle(d.cardStyle).background==='none')){
+              const background=matchCardBackground(d)||DEFAULT_CARD_BACKGROUND;
+              d.cardStyle=normalizeCardStyle({...normalizeCardStyle(d.cardStyle),background});
+              d.backgroundAuto=true;
+            }
             if(['request','style'].includes(result.intent)&&result.ready&&!d.careMode&&!d.deletedAt&&d.status==='draft'&&d.title&&(d.skills?.length||d.problem)){
               try{preview=await matching.preview(row,d,{semantic:true,timeoutMs:20000});}
               catch{preview={unavailable:true,count:0,timeUnconfirmed:0,sent:false};}
@@ -686,7 +891,7 @@ const server = createServer(async (req, res) => {
                 else result.reply+='\n\n（预匹配：暂未找到合适人选；发布后后台会继续匹配。）';
               }
             }
-          } else result = clarify(d, b.message);
+          } else result = clarify(d, clarifyMessage);
           if (result.intent === 'care') {
             d.careMode=true;
             if (result.careSafety==='urgent') d.careSafety='urgent';
@@ -696,7 +901,7 @@ const server = createServer(async (req, res) => {
             else if(result.careCard) d.carePreview=result.careCard;
           } else if(['request','help'].includes(result.intent)) d.careMode=false;
         }
-        const recommendations=result.intent==='help'&&!b.entryMode&&d.careSafety!=='urgent'&&!(result.outputFiles||[]).length
+        const recommendations=result.intent==='help'&&!result.suppressRecommendations&&!b.entryMode&&d.careSafety!=='urgent'&&!(result.outputFiles||[]).length
           ?agentCatalog.recommendFor(b.message,result.reply,{limit:3}):[];
         const staged=await attachments.stageOutputs(row,user,result.outputFiles);
         try{
@@ -704,10 +909,11 @@ const server = createServer(async (req, res) => {
           if(owned(row.id,user).data!==row.data)fail(409,'DRAFT_CHANGED','会话已在其他页面修改，请刷新后重试。');
           db.exec('BEGIN IMMEDIATE');
           try{
-            save(row,d);run('INSERT INTO messages (request_id,role,content,intent) VALUES (?,?,?,?)',row.id,'user',b.message,result.intent);
+            save(row,d);run('INSERT INTO messages (request_id,role,content,intent,meta) VALUES (?,?,?,?,?)',row.id,'user',b.message,result.intent,JSON.stringify({taskAttachmentIds:inputAttachmentIds,...(messageAttachments.length?{attachments:messageAttachments}:{})}));
             const inserted=run('INSERT INTO messages (request_id,role,content,intent,meta) VALUES (?,?,?,?,?)',row.id,'assistant',result.reply,result.intent,recommendations.length?JSON.stringify({recommendations}):null);
             if(remoteConfig)for(const session of result.conversations||[{scope:remoteConfig.scope,conversationId:result.conversationId}])
               run('INSERT INTO dify_conversations VALUES (?,?,?) ON CONFLICT(request_id,scope) DO UPDATE SET conversation_id=excluded.conversation_id',row.id,session.conversationId,session.scope);
+            if(remoteConfig&&result.deliveredAttachmentIds?.length)attachments.recordDelivered(row.id,remoteConfig.scope,result.conversationId,result.deliveredAttachmentIds);
             staged.commit(inserted.lastInsertRowid);db.exec('COMMIT');
           }catch(e){db.exec('ROLLBACK');throw e;}
         }catch(e){await staged.rollback();throw e;}
@@ -778,7 +984,13 @@ const server = createServer(async (req, res) => {
         if(d.status==='open'&&b.confirmed!==true)fail(400,'CONFIRM_REQUIRED','修改公开卡片需要确认保存。');
         if(d.status==='open'&&b.visibility&&b.visibility!=='company')fail(400,'INVALID_FIELD','已发布卡片请使用移除功能下架。');
         delete b.confirmed;delete b.coverAttachmentId;delete b.rewardAttachmentId;
-        if (b.cardStyle) b.cardStyle = normalizeCardStyle({...normalizeCardStyle(d.cardStyle), ...b.cardStyle});
+        if (b.cardStyle) {
+          b.cardStyle = normalizeCardStyle({...normalizeCardStyle(d.cardStyle), ...b.cardStyle});
+          if (b.cardStyle.background !== normalizeCardStyle(d.cardStyle).background) {
+            d.backgroundChosen = true;
+            d.backgroundAuto = false;
+          }
+        }
         Object.assign(d, b);
         if(d.status==='open'&&(!d.title.trim()||!d.problem.trim()||!d.desiredOutcome.trim()||![...d.deliverables,...d.acceptanceCriteria].some(x=>x.trim())))fail(400,'INCOMPLETE','公开卡片须保留标题、问题、目标及交付物或完成标准。');
         db.exec('BEGIN IMMEDIATE');try{if(coverAttachmentId!==undefined)workflow.applyCover(row,d,coverAttachmentId,user);if(rewardAttachmentId!==undefined)workflow.applyReward(row,d,rewardAttachmentId,user);save(row,d);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
@@ -836,7 +1048,7 @@ const server = createServer(async (req, res) => {
         d.status = "claimed";
         d.updatedAt = now();
         db.exec('BEGIN IMMEDIATE');
-        let result;try{points.requireSlot(user.id,'claiming');if(d.rewardPolicy===DIFFICULTY_REWARD_POLICY){const grade=difficulty.state(id);if(grade.status!=='scored'||!Number.isInteger(grade.score)||grade.score<1||grade.score>5)fail(409,'DIFFICULTY_PENDING','积分尚未评定，请待系统完成难度评估后再接取。');d.rewardPoints=grade.score;}result = run(
+        let result;try{points.requireSlot(user.id,'claiming');if(d.rewardPolicy===DIFFICULTY_REWARD_POLICY&&!d.isDemo){const grade=difficulty.state(id);if(grade.status!=='scored'||!Number.isInteger(grade.score)||grade.score<1||grade.score>5)fail(409,'DIFFICULTY_PENDING','积分尚未评定，请待系统完成难度评估后再接取。');d.rewardPoints=grade.score;}else if(d.isDemo&&(!Number.isInteger(d.rewardPoints)||d.rewardPoints<1||d.rewardPoints>5)){d.rewardPoints=1;}result = run(
           "UPDATE requests SET claimer_id=?,data=? WHERE id=? AND claimer_id IS NULL AND json_extract(data,'$.status')='open'",
           user.id,
           JSON.stringify(d),

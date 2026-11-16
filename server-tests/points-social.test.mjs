@@ -48,6 +48,7 @@ test('点赞幂等、任务并发上限、难度评分、退回重提、唯一�
   const approve={submissionId:submission.data.submissions[0].id,decision:'approve',feedback:'合成验收通过',confirmed:true};
   const completed=await Promise.all([call('/requests/'+first+'/review','POST',approve,a.cookie),call('/requests/'+first+'/review','POST',approve,a.cookie)]);assert.deepEqual(completed.map(r=>r.status).sort(),[200,409]);
   assert.equal(completed.find(r=>r.status===200).data.request.awardedPoints,pointsFor(first));assert.equal(db.prepare('SELECT count(*) n FROM task_points WHERE request_id=?').get(first).n,1);
+  assert.ok(completed.find(r=>r.status===200).data.request.deletedAt,'验收完成后自动下架');
   assert.equal((await call('/me/task-limits','GET',undefined,b.cookie)).data.claiming.used,2);
   assert.equal((await call('/requests/'+ids[4]+'/restore','POST',{confirmed:true},a.cookie)).status,200,'验收后释放发布名额');
   const draftSubmit=await call('/requests/'+second+'/submit','POST',{note:'第一版',attachmentIds:[]},b.cookie);

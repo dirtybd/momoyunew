@@ -37,6 +37,9 @@ test('新版 Agent SSE 分片、中文、最终快照与严格卡片校验', asy
   assert.equal(parsed.card.status,undefined);
   assert.equal(parsed.card.owner_id,undefined);
   assert.equal(parsed.card.anonymous,undefined);
+  const layout = {...structured(), card:{...structured().card, detailLayout:'dossier'}};
+  assert.equal(parseDifyAnswer(JSON.stringify(layout)).card.detailLayout,'dossier');
+  assert.throws(()=>parseDifyAnswer(JSON.stringify({...layout, card:{...layout.card, detailLayout:'bad'}})));
   const withBackground={...structured(),intent:'request',cardStyle:{theme:'orange',layout:'note',radius:'soft',emphasis:'normal',background:'mountain'}};
   assert.equal(parseDifyAnswer(JSON.stringify(withBackground)).cardStyle.background,'mountain');
   withBackground.cardStyle.shape='polaroid';

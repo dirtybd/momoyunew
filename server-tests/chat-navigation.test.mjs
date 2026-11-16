@@ -24,14 +24,14 @@ test('助手生成或上传时可以浏览其他页面，返回对话不会清�
 
 test('对话异步完成不占用或清除其他页面的操作状态；退出清理私密现场',async()=>{
   const source=fs.readFileSync('frontend/src/main.jsx','utf8'),calls=[];
-  const ctx={chatBusy:false,uploading:false,busy:false,messages:[],draft:null,fields:null,careMode:false,assistantController:{current:null},AbortController,profileBlank:{},
+  const ctx={chatBusy:false,uploading:false,busy:false,messages:[],pendingFiles:[],draft:null,fields:null,careMode:false,assistantController:{current:null},AbortController,profileBlank:{},
     sendAssistant:async()=>({request:{id:'new',materialFiles:[]},messages:[{role:'assistant',content:'finished'}],intent:'help',mode:'dify'}),api:async()=>({}),board:async()=>{}};
   for(const name of ['setBusy','setChatBusy','setProgress','setStreamReply','setError','setMessages','setDraft','setAttachmentFiles','setCareMode','setShowCare','setHealth','setNotice','setUser','setProfile','setFields','setShowCard','setCareSafety','setCarePreview','setPage','setChatViewKey'])ctx[name]=value=>calls.push({name,value});
   await vm.runInNewContext(source.slice(source.indexOf(' const send='),source.indexOf('\n const resume='))+';send("synthetic");',ctx,{timeout:500});
   assert.ok(!calls.some(c=>c.name==='setBusy'),'chat never toggles shared mutation state');
   assert.ok(calls.some(c=>c.name==='setChatBusy'&&c.value===true));assert.ok(calls.some(c=>c.name==='setChatBusy'&&c.value===false));
   calls.length=0;
-  await vm.runInNewContext(source.slice(source.indexOf(' const logout='),source.indexOf('\n const saveProfile='))+';logout();',ctx,{timeout:500});
+  await vm.runInNewContext(source.slice(source.indexOf(' const logout='),source.indexOf('\n const openProfile='))+';logout();',ctx,{timeout:500});
   assert.ok(calls.some(c=>c.name==='setMessages'&&Array.isArray(c.value)&&!c.value.length));assert.ok(calls.some(c=>c.name==='setDraft'&&c.value===null));
   assert.ok(calls.some(c=>c.name==='setChatViewKey'),'private composer resets at logout');
 });

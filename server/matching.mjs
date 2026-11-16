@@ -130,7 +130,12 @@ export function matchingService({db,config=matchingConfig(),clock=()=>Date.now()
   };
   function list(userId,cursor=Infinity){
     const rows=all('SELECT rowid,* FROM notifications WHERE user_id=? AND rowid<? ORDER BY rowid DESC LIMIT 31',userId,cursor),more=rows.length>30;
-    const items=rows.slice(0,30).map(n=>{const r=get('SELECT * FROM requests WHERE id=?',n.request_id),d=r&&JSON.parse(r.data),visible=d&&d.visibility==='company'&&!d.deletedAt&&!d.moderatedAt&&d.status!=='draft';return {id:n.id,requestId:n.request_id,title:visible?d.title:'此需求已不再公开',reason:visible?n.reason:'原推荐已失效',status:visible?d.status:'unavailable',available:!!visible,createdAt:new Date(n.created_at).toISOString(),readAt:n.read_at?new Date(n.read_at).toISOString():null};});
+    const items=rows.slice(0,30).map(n=>{
+      if(n.type==='feedback'){
+        let fb=null;try{fb=get('SELECT content,category,created_at FROM feedback WHERE id=?',n.request_id);}catch{}
+        return {id:n.id,requestId:null,feedbackId:n.request_id,type:'feedback',threadId:null,title:'站内改进意见',reason:fb?.content||n.reason||'',status:'feedback',available:false,createdAt:new Date(n.created_at).toISOString(),readAt:n.read_at?new Date(n.read_at).toISOString():null};
+      }
+      const r=get('SELECT * FROM requests WHERE id=?',n.request_id),d=r&&JSON.parse(r.data),visible=d&&d.visibility==='company'&&!d.deletedAt&&!d.moderatedAt&&d.status!=='draft';let threadId=null;if(n.type==='question'||n.type==='reply'){try{threadId=get('SELECT id FROM request_threads WHERE request_id=? AND (asker_id=? OR owner_id=?) ORDER BY updated_at DESC LIMIT 1',n.request_id,userId,userId)?.id||null;}catch{}}return {id:n.id,requestId:n.request_id,type:n.type,threadId,title:visible?d.title:'此需求已不再公开',reason:visible?n.reason:'原推荐已失效',status:visible?d.status:'unavailable',available:!!visible,createdAt:new Date(n.created_at).toISOString(),readAt:n.read_at?new Date(n.read_at).toISOString():null};});
     return {items,unread:get('SELECT count(*) AS n FROM notifications WHERE user_id=? AND read_at IS NULL',userId).n,nextCursor:more?String(rows[29].rowid):null};
   }
   const read=(userId,id)=>run('UPDATE notifications SET read_at=? WHERE user_id=? AND id=? AND read_at IS NULL',clock(),userId,id);

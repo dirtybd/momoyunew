@@ -1,8 +1,9 @@
 import React,{useState} from 'react';
 import {normalizeCardStyle} from '../../shared/card-style.mjs';
+import {CARD_BACKGROUND_OPTIONS} from '../../shared/card-backgrounds.mjs';
 import {CardCanvas,visualStyle} from './CardCanvas.jsx';
 import {FilePicker} from './Attachments.jsx';
-const choices={theme:[['orange','暖橙'],['ink','深墨'],['mint','薄荷'],['sand','沙色'],['rose','玫瑰'],['sky','晴空']],layout:[['standard','标准'],['poster','海报'],['note','便笺']],shape:[['standard','标准'],['ticket','票根'],['polaroid','拍立得'],['bubble','气泡']],radius:[['soft','柔和'],['square','方角']],emphasis:[['normal','常规'],['bold','加重']],background:[['none','纯色'],['mountain','山景'],['coast','海岸'],['meme','摸鱼插画']]};
+const choices={theme:[['orange','暖橙'],['ink','深墨'],['mint','薄荷'],['sand','沙色'],['rose','玫瑰'],['sky','晴空']],layout:[['standard','标准'],['poster','海报'],['note','便笺']],shape:[['standard','标准'],['ticket','票根'],['polaroid','拍立得'],['bubble','气泡']],radius:[['soft','柔和'],['square','方角']],emphasis:[['normal','常规'],['bold','加重']],background:CARD_BACKGROUND_OPTIONS};
 export function OfficialStyleEditor({value,onChange,api,disabled,onBusy}){
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[library,setLibrary]=useState(null);
  const style=visualStyle(value.cardStyle);

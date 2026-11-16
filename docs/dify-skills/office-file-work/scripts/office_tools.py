@@ -24,7 +24,19 @@ def _need(mod, hint):
     try:
         return __import__(mod)
     except Exception:
-        sys.exit(f"缺少依赖 {mod}，请先按 Skill 的 bootstrap 步骤安装（{hint}）")
+        sys.exit(f"当前解释器缺少依赖 {mod}（{hint}）；报告环境限制或使用已验证的现有解释器，不自动安装。")
+
+
+def _emit_read(lines, limit=12000):
+    remaining = limit
+    for line in lines:
+        text = str(line) + "\n"
+        if len(text) > remaining:
+            print(text[:remaining], end="")
+            print("\noutput_truncated=true；以上仅为读取样本，不能视为全文或全表统计。")
+            return
+        print(text, end="")
+        remaining -= len(text)
 
 
 def cmd_images2pdf(a):
@@ -74,13 +86,15 @@ def cmd_docx_read(a):
     docx = _need("docx", "python-docx")
     d = docx.Document(os.path.abspath(a.inp))
     paras = [p.text for p in d.paragraphs]
-    print(f"paragraphs={len(paras)} tables={len(d.tables)}")
-    for i, t in enumerate(paras[: a.limit]):
-        print(f"[{i}] {t}")
-    for ti, tb in enumerate(d.tables):
-        print(f"table{ti} rows={len(tb.rows)} cols={len(tb.columns)}")
-        for r in tb.rows[:3]:
-            print("  | " + " | ".join(c.text for c in r.cells))
+    def lines():
+        yield f"paragraphs={len(paras)} tables={len(d.tables)} coverage=正文前{a.limit}段、各表前3行；不含图片文字"
+        for i, text in enumerate(paras[:a.limit]):
+            yield f"[paragraph {i+1}] {text}"
+        for ti, tb in enumerate(d.tables):
+            yield f"table{ti} rows={len(tb.rows)} cols={len(tb.columns)} sampled_rows={min(3,len(tb.rows))}"
+            for ri, row in enumerate(tb.rows[:3]):
+                yield f"[table{ti} row{ri+1}] " + " | ".join(c.text for c in row.cells)
+    _emit_read(lines())
 
 
 def _replace_in_paragraph(p, find, repl, limit=0):
@@ -184,16 +198,21 @@ def cmd_docx_write(a):
 
 def _load_xlsx(path):
     openpyxl = _need("openpyxl", "openpyxl")
-    return openpyxl.load_workbook(path)
+    return openpyxl.load_workbook(path, read_only=True)
 
 
 def cmd_xlsx_read(a):
     wb = _load_xlsx(os.path.abspath(a.inp))
-    print(f"sheets={wb.sheetnames} active={wb.active.title}")
     ws = wb[a.sheet] if a.sheet else wb.active
-    print(f"sheet={ws.title} dims={ws.dimensions} rows={ws.max_row} cols={ws.max_column}")
-    for r in ws.iter_rows(min_row=1, max_row=min(ws.max_row, a.max_rows)):
-        print(" | ".join("" if c.value is None else str(c.value) for c in r))
+    def lines():
+        yield f"sheets={wb.sheetnames} active={wb.active.title}"
+        yield f"sheet={ws.title} rows={ws.max_row} cols={ws.max_column} coverage=前{a.max_rows}行、前24列；公式仅原式，未重算"
+        for i, row in enumerate(ws.iter_rows(min_row=1, max_row=min(ws.max_row,a.max_rows), max_col=min(ws.max_column,24)),1):
+            yield f"[row {i}] " + " | ".join("" if c.value is None else str(c.value) for c in row)
+    try:
+        _emit_read(lines())
+    finally:
+        wb.close()
 
 
 def _cast(value, mode):
@@ -257,11 +276,13 @@ def cmd_pdf_merge(a):
 def cmd_pdf_read(a):
     pypdf = _need("pypdf", "pypdf")
     r = pypdf.PdfReader(os.path.abspath(a.inp))
-    print(f"pages={len(r.pages)}")
-    for i, pg in enumerate(r.pages[: a.limit]):
-        txt = (pg.extract_text() or "").strip()
-        print(f"--- page {i+1} ---")
-        print(txt[:2000])
+    def lines():
+        yield f"pages={len(r.pages)} coverage=前{a.limit}页、每页最多2000字；无OCR"
+        for i, pg in enumerate(r.pages[:a.limit]):
+            text = (pg.extract_text() or "").strip()
+            yield f"--- page {i+1} text_truncated={len(text)>2000} ---"
+            yield text[:2000]
+    _emit_read(lines())
 
 
 def cmd_organize(a):

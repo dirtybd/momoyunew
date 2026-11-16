@@ -1,0 +1,131 @@
+/* 摸鱼空间 · 帖子展开态三种版式
+   polaroid 拍立得灯箱 / stage 表情包舞台 / magazine 杂志跨页
+   只改媒体与正文外层结构，留言、点赞、编辑、审核逻辑仍由 Care.jsx 负责。 */
+
+/* 发帖 / 编辑：展开样式选择器 */
+.care-post-meta-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.care-post-meta-row .care-kind-picker{flex-wrap:wrap}
+.care-layout-field{display:grid;gap:6px;font-size:13px;font-weight:600;color:#5f574e;white-space:nowrap}
+.care-layout-field select{font:inherit;font-weight:400;min-height:38px;padding:7px 10px;border:1px solid #d6d1ca;border-radius:6px;background:#fff;color:#211f1c}
+.care-hand{font-family:"Segoe Script","Comic Sans MS","KaiTi",cursive}
+
+/* 版式内共用的小标签 */
+.care-media-badge{position:absolute;right:-12px;top:16px;z-index:3;background:#fff6e6;border:1px solid #e9cda4;border-radius:4px;padding:5px 9px;font-size:11px;line-height:1.2;color:#8a5a20;transform:rotate(4deg);box-shadow:0 3px 8px rgba(60,40,20,.16);white-space:nowrap}
+.care-save-chip{flex:none;font-size:12px;color:#6f655a;border:1px solid #e6ddd0;background:#fffdf8;border-radius:12px;padding:3px 9px;white-space:nowrap}
+.care-detail-count{position:absolute;z-index:3;background:rgba(255,253,248,.95);border:1px solid #eadfd2;border-radius:4px;padding:3px 8px;font-size:12px;line-height:1.4;color:#6d6257;font-variant-numeric:tabular-nums}
+
+/* ---------- 拍立得灯箱 ---------- */
+.care-reader--polaroid{grid-template-columns:minmax(0,1.06fr) minmax(340px,.94fr);background:radial-gradient(circle at 30% 18%,#3a332c,#211d19 72%);height:min(680px,calc(92dvh - 118px))}
+.care-reader--polaroid .care-reader-media{background:transparent;display:grid;place-items:center;padding:26px 22px 20px;overflow:visible}
+.care-polaroid{position:relative;display:flex;flex-direction:column;width:min(100%,470px);max-height:100%;margin:0;padding:15px 15px 58px;background:#fffdf8;box-shadow:0 26px 54px rgba(0,0,0,.4);transform:rotate(-1.6deg)}
+.care-polaroid-tape{position:absolute;left:50%;top:-13px;z-index:3;width:110px;height:25px;background:rgba(247,232,202,.84);border:1px solid rgba(210,188,154,.55);box-shadow:0 1px 2px rgba(60,45,25,.06);transform:translateX(-50%) rotate(-3deg);pointer-events:none}
+.care-polaroid-tape:after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 7px,rgba(255,255,255,.28) 7px 9px)}
+.care-polaroid-photo{position:relative;min-height:0;height:clamp(250px,44vh,390px);background:#fff8ee;border:1px solid #eee5d8;overflow:hidden}
+.care-polaroid-photo .care-gallery{height:100%}
+.care-polaroid-photo .care-gallery>img{object-fit:contain}
+.care-polaroid-photo .care-text-cover{padding:26px}
+.care-polaroid .care-gallery-count{top:auto;right:14px;bottom:14px}
+.care-polaroid-count{position:absolute;left:24px;top:24px;z-index:3;background:rgba(255,253,248,.95);border:1px solid #eadfd2;border-radius:4px;padding:3px 8px;font-size:12px;color:#6d6257;font-variant-numeric:tabular-nums}
+.care-polaroid-caption{position:absolute;left:20px;right:18px;bottom:15px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.care-polaroid-caption .care-hand{min-width:0;font-size:19px;line-height:1.25;color:#4d4439;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transform:rotate(-1deg)}
+.care-polaroid.is-video{transform:none}
+.care-polaroid.is-video .care-polaroid-photo{height:clamp(260px,44vh,380px);background:#1f1c18;border-color:#2c2823}
+.care-polaroid.is-video .care-gallery>.video-player{height:100%;padding:10px}
+.care-polaroid.is-video .care-gallery .video-player video{height:auto;max-height:calc(100% - 46px)}
+.care-polaroid.is-video .care-gallery .video-player>a{color:#f0c9a5}
+.care-polaroid.is-video .care-gallery .field-hint{color:#e9ded0}
+.care-reader--polaroid .care-reader-copy{align-self:center;max-height:calc(100% - 40px);margin:20px 0 20px 24px;padding:24px 24px 20px;background:#fffdfa;border-radius:14px;box-shadow:0 24px 50px rgba(0,0,0,.3)}
+.care-reader--polaroid .care-post-byline{margin-bottom:18px}
+
+/* ---------- 表情包舞台 ---------- */
+.care-reader--stage{grid-template-columns:minmax(0,1fr) minmax(320px,352px);height:min(680px,calc(92dvh - 118px));padding:20px 20px 18px;background:#f5ede1;background-image:radial-gradient(#e4d6c3 1px,transparent 1px);background-size:18px 18px}
+.care-reader--stage .care-reader-media{position:relative;display:flex;align-items:center;justify-content:center;margin-right:18px;padding:22px;background:#fbf5ea;border:2px dashed #e4cfb2;border-radius:16px;overflow:hidden}
+.care-reader--stage .care-reader-copy{padding:22px 22px 18px;background:#fffdfa;border:1px solid #eadfce;border-radius:14px;box-shadow:0 8px 20px rgba(70,45,20,.07)}
+.care-stage-corner{position:absolute;left:20px;top:17px;z-index:3;font-size:12px;letter-spacing:.08em;color:#6f5f4c}
+.care-reader--stage .care-media-badge{right:18px;top:15px}
+.care-stage-bubble{position:absolute;left:22px;top:52px;z-index:2;max-width:min(78%,390px);padding:13px 16px;background:#fffdfa;border:1px solid #e9dfd1;border-radius:18px 18px 18px 5px;box-shadow:0 10px 24px rgba(80,55,25,.1);transform:rotate(-1.2deg)}
+.care-stage-bubble:after{content:"";position:absolute;left:26px;bottom:-9px;width:16px;height:16px;background:#fffdfa;border-right:1px solid #e9dfd1;border-bottom:1px solid #e9dfd1;transform:rotate(45deg)}
+.care-stage-bubble h3{font-size:20px;line-height:1.4;letter-spacing:-.02em;overflow-wrap:anywhere}
+.care-stage-bubble p{margin-top:5px;font-size:12px;line-height:1.6;color:#6f655a;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.care-stage-sticker{position:relative;width:min(100%,430px);height:clamp(230px,38vh,330px);margin-top:70px;background:#fffdf8;border:7px solid #fff;border-radius:10px;box-shadow:0 18px 34px rgba(70,45,20,.2);transform:rotate(1.8deg);overflow:hidden}
+.care-stage-sticker .care-gallery{height:100%}
+.care-stage-sticker .care-gallery>img{object-fit:contain}
+.care-stage-sticker .care-text-cover{padding:24px}
+.care-stage-reactions{position:absolute;right:20px;top:50%;z-index:3;display:grid;gap:8px;justify-items:end;transform:translateY(-50%)}
+.care-stage-reactions .care-like-control{display:grid;justify-items:end;gap:6px;margin:0}
+.care-stage-reactions .care-like-button{padding:7px 12px;background:#fffdfa;border:1px solid #e9dfd1;border-radius:16px;font-size:13px;box-shadow:0 5px 12px rgba(70,45,20,.08);transform:rotate(1.4deg)}
+.care-stage-reactions .care-save-chip{transform:rotate(-1.5deg);box-shadow:0 5px 12px rgba(70,45,20,.08)}
+.care-stage-reactions .inline-error{max-width:180px;text-align:right}
+
+/* ---------- 杂志跨页 ---------- */
+.care-reader--magazine{position:relative;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);height:min(680px,calc(92dvh - 118px));background:#fffdfa}
+.care-reader--magazine:after{content:"";position:absolute;left:50%;top:0;bottom:0;z-index:2;width:26px;background:linear-gradient(90deg,rgba(60,45,30,.06),rgba(255,255,255,0),rgba(60,45,30,.04));transform:translateX(-50%);pointer-events:none}
+.care-reader--magazine .care-reader-media{position:relative;display:flex;align-items:center;justify-content:center;padding:30px 30px 42px;background:#f7f0e5}
+.care-magazine-frame{position:relative;width:100%;height:100%;background:#fff8ee;border:1px solid #eadfce;box-shadow:0 12px 28px rgba(60,40,20,.1);overflow:hidden}
+.care-magazine-frame .care-gallery{height:100%}
+.care-magazine-frame .care-text-cover{padding:28px}
+.care-reader--magazine .care-detail-count{left:38px;bottom:16px}
+.care-magazine-pageno{position:absolute;right:38px;bottom:14px;font-size:12px;letter-spacing:.1em;color:#7b7166;font-variant-numeric:tabular-nums}
+.care-reader--magazine .care-reader-copy{padding:30px 34px 24px}
+.care-reader--magazine .care-post-body h3{font-size:28px;line-height:1.35;letter-spacing:-.02em}
+
+@media(max-width:1100px){
+  .care-reader--polaroid{grid-template-columns:minmax(0,1fr) minmax(310px,1fr)}
+  .care-reader--polaroid .care-reader-copy{margin-left:18px;padding:20px}
+  .care-reader--stage{grid-template-columns:minmax(0,1fr) minmax(280px,310px);padding:16px}
+  .care-reader--stage .care-reader-media{margin-right:14px;padding:16px}
+  .care-reader--stage .care-reader-copy{padding:20px}
+  .care-stage-bubble{left:16px;top:48px;max-width:min(80%,310px);padding:11px 13px}
+  .care-stage-bubble h3{font-size:18px}
+  .care-stage-sticker{width:min(100%,360px);height:clamp(210px,34vh,290px)}
+  .care-reader--magazine .care-reader-media{padding:22px 22px 38px}
+  .care-reader--magazine .care-reader-copy{padding:24px}
+  .care-reader--magazine .care-detail-count{left:30px}
+  .care-magazine-pageno{right:30px}
+}
+
+@media(max-width:900px){
+  .care-reader--stage{grid-template-columns:minmax(0,1fr) minmax(260px,290px)}
+  .care-reader--stage .care-reader-media{flex-direction:column;justify-content:flex-start}
+  .care-stage-bubble{left:14px;top:42px;max-width:min(84%,300px)}
+  .care-stage-bubble h3{font-size:17px}
+  .care-stage-bubble p{display:none}
+  .care-stage-sticker{width:min(100%,320px);height:clamp(200px,32vh,270px);margin-top:52px}
+  .care-stage-reactions{position:static;display:flex;align-self:flex-end;justify-content:flex-end;margin-top:10px;transform:none}
+  .care-stage-reactions .care-like-control{display:flex}
+}
+
+@media(max-width:700px){
+  .care-post-meta-row{align-items:stretch}
+  .care-layout-field{width:100%}
+  .care-layout-field select{width:100%}
+  .care-reader--polaroid{display:block;height:auto;padding:18px 12px 16px;background:radial-gradient(circle at 30% 10%,#3a332c,#211d19 75%)}
+  .care-reader--polaroid .care-reader-media{display:block;height:auto;padding:12px 6px 8px;overflow:visible}
+  .care-polaroid{width:100%;max-width:none;padding:12px 12px 50px;transform:rotate(-1deg)}
+  .care-polaroid-photo{height:min(46dvh,360px)}
+  .care-polaroid-caption{left:16px;right:14px;bottom:13px}
+  .care-polaroid-caption .care-hand{font-size:17px}
+  .care-reader--polaroid .care-reader-copy{max-height:none;margin:16px 0 0;padding:20px;border-radius:12px}
+  .care-reader--stage{display:block;height:auto;padding:12px}
+  .care-reader--stage .care-reader-media{display:block;height:auto;min-height:0;margin:0 0 14px;padding:16px}
+  .care-stage-corner{position:static;display:block;margin-bottom:10px;font-size:11px}
+  .care-reader--stage .care-media-badge{right:12px;top:12px}
+  .care-stage-bubble{position:static;max-width:none;margin:14px 0 0;transform:none}
+  .care-stage-bubble:after{display:none}
+  .care-stage-bubble p{display:-webkit-box}
+  .care-stage-sticker{width:100%;height:min(52vw,300px);margin:20px auto 0;transform:rotate(1.4deg)}
+  .care-stage-reactions{position:static;display:flex;justify-content:flex-end;margin-top:14px;transform:none}
+  .care-stage-reactions .care-like-control{display:flex}
+  .care-reader--stage .care-reader-copy{padding:20px}
+  .care-reader--magazine{display:block;height:auto}
+  .care-reader--magazine:after{display:none}
+  .care-reader--magazine .care-reader-media{height:min(48dvh,420px);padding:14px 14px 34px}
+  .care-reader--magazine .care-detail-count{left:20px;bottom:10px}
+  .care-magazine-pageno{right:20px;bottom:9px}
+  .care-reader--magazine .care-reader-copy{padding:20px}
+  .care-reader--magazine .care-post-body h3{font-size:22px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .care-polaroid,.care-stage-sticker,.care-stage-bubble{transform:none}
+}

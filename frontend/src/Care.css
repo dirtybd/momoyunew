@@ -50,3 +50,17 @@
 .is-compact .care-feed-card.is-text[data-kind=mood] .care-feed-caption{background:#f0f2ee}
 .is-compact .care-feed-grid .care-feed-text{background:#f6f3ed}
 .is-compact .care-feed-card[data-kind=mood] .care-feed-text{background:#f0f2ee}
+
+/* 倾诉卡设计：与互助卡工作室同一套 A 版外壳。 */
+.care-studio .cs-mark.care-mark{background:#4d7a63;box-shadow:0 2px 5px rgba(43,82,64,.22)}
+.cs-kind-care{background:#e3efe8;color:#3f6856}
+.care-card-photos{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.care-card-photos figure{position:relative;margin:0;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid var(--card-border,#e2d8ca);background:#fff}
+.care-card-photos img,.care-card-photos video,.care-card-photos .video-thumb{width:100%;height:100%;object-fit:cover;display:block}
+.care-card-photos figcaption{position:absolute;left:4px;bottom:4px;background:rgba(255,255,255,.9);border-radius:3px;padding:1px 4px;font-size:8px;color:#6f6255}
+.care-studio-photos{background:#fffdfa;border:1px solid #ebe3d7;border-radius:8px;padding:8px 10px}
+.care-studio-photos .care-photo-controls{gap:8px}
+.care-studio-photos .care-photo-controls>span{font-size:9.5px;color:#948a7d}
+.care-studio-photos .care-photo-controls .text-button{font-size:10px}
+.care-studio-photos .care-photo-selection{margin-top:8px;gap:6px}
+.care-studio-photos .care-photo-selection>div{width:64px;height:64px}

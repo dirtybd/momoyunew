@@ -4,11 +4,11 @@
 
 ## 请求通则
 
-同源 `/api`，除附件上传使用 multipart/form-data 外均为 JSON请求，cookie登录态（HttpOnly + SameSite）。失败返回 `{error:{code,message}}`，有效HTTP状态码。浏览器不保存Dify密钥。localStorage不作为身份认证。没有Dify密钥时明确使用本地规则；配置密钥后使用真实 Agent，调用失败不假装本地回复来自模型。
+同源 `/api`，除附件和头像上传使用 multipart/form-data 外均为 JSON请求，cookie登录态（HttpOnly + SameSite）。失败返回 `{error:{code,message}}`，有效HTTP状态码。浏览器不保存Dify密钥。localStorage不作为身份认证。没有Dify密钥时明确使用本地规则；配置密钥后使用真实 Agent，调用失败不假装本地回复来自模型。
 
 ## 数据
 
-User = `{id,username,displayName,department,skills:string[],skillDescription:string,availability:string,acceptingHelp:boolean,bio:string,helpPreferences,role:'employee'|'admin'}`。skillDescription为明确用于AI匹配的经验说明，最多2000字；旧档案默认为空，不从私人bio迁移。helpPreferences见文末人员匹配接口。
+User = `{id,username,displayName,department,skills:string[],skillDescription:string,availability:string,acceptingHelp:boolean,bio:string,helpPreferences,avatar:string|null,role:'employee'|'admin'}`。skillDescription为明确用于AI匹配的经验说明，最多2000字；旧档案默认为空，不从私人bio迁移。avatar为`/api/avatars/...`地址，无上传时为空。helpPreferences见文末人员匹配接口。
 Request = `{id,title,problem,desiredOutcome,deliverables:string[],acceptanceCriteria:string[],materials:string[],constraints:string[],deadline:string|null,skills:string[],rewardPoints:number,anonymous:boolean,visibility:'company'|'private',fallbackToBoard:boolean,source:'employee'|'official',kind:'request'|'announcement'|'bounty',status:'draft'|'open'|'claimed'|'submitted'|'changes_requested'|'completed'|'cancelled',owner:{displayName,department}|null,isMine:boolean,isClaimedByMe:boolean,claimerLabel:string|null,createdAt,updatedAt,isDemo:boolean}`。
 
 公开匿名卡片 owner=null，不返回员工账号/内部ownerId/聊天/原始材料。附件原件只向参与双方提供；未提供的背景原图仅本人可下载，公开封面为去元数据预览图。官方权限由服务端判定，注册/编辑档案不能提权。演示数据标 isDemo=true；不将样例数说成真实平台业绩。
@@ -22,7 +22,12 @@ Request 额外返回 `cardStyle`，枚举以 `shared/card-style.mjs` 为准：th
 - `POST /api/auth/register` body `{username,password,displayName,department,skills,availability,acceptingHelp,bio}` → `{user}`；注册和首次建档一体完成。password至少8字符，username唯一。必须注册成功后才显示登录成功。
 - `POST /api/auth/login` body `{username,password}` → `{user}`。
 - `POST /api/auth/logout` → `{ok:true}`。
-- `PUT /api/profile` body `{displayName,department,skills,availability,acceptingHelp,bio}` → `{user}`。
+- `PUT /api/profile` body `{displayName,department,skills,availability,acceptingHelp,bio,skillDescription,helpPreferences}` → `{user}`；不会改动头像。
+- `GET /api/me/profile-overview` → `{user,totalPoints,completedCount,monthPoints,monthCompleted,monthOwners,rank,rankParticipants,recent:[{requestId,title,skills,points,awardedAt}]}`；需要登录。累计与本月数据来自`task_points`，月份按北京时间；只返回最近3条完成记录，不返回对方身份。
+- `GET /api/me/points?limit=200&offset=0` → `{items:[...],total,limit,offset}`；需要登录，返回本人的完整互助与积分记录，上限500条。
+- `POST /api/profile/avatar` multipart 字段`file` → `{user}`；需要登录。支持PNG/JPG/WebP/GIF，最大5MB，服务端旋转并裁成512×512 WebP，旧头像文件自动删除。
+- `DELETE /api/profile/avatar` → `{user}`；需要登录，移除头像并删除文件。
+- `GET /api/avatars/:file`：返回头像WebP；文件名由服务端随机生成，可匿名读取，缺失时404。
 
 ## 需求和澄清
 
@@ -54,7 +59,7 @@ Request 额外返回 `cardStyle`，枚举以 `shared/card-style.mjs` 为准：th
 
 `POST /api/clarify` 请求保持不变；`Accept: text/event-stream` 返回 `event: status`（stage/label）、`event: result`（原 JSON 结果）、`event: error`（message）。默认仍返回 JSON。中断连接会取消本轮上游读取，未完成结果不覆盖草稿。
 
-需求视图新增只读 `cardArtwork`，为空或 `{id,design:{name,paper,ink,accent,accentInk,shape,layout}}`。不接受通过普通 PATCH 或模型最终 JSON 写入成品。只有本轮工具事件中的已验签结果可更新它。
+需求视图新增只读 `cardArtwork`，为空或 `{id,design:{name,paper,ink,accent,accentInk,shape,layout,icons}}`（`icons` 为后端按卡片内容挑选的本地图标名，v2 设计不再返回 `elements`）。不接受通过普通 PATCH 或模型最终 JSON 写入成品。只有本轮工具事件中的已验签结果可更新它。用户明确把上传图片设为背景时，后端保留 `cardCover`，不生成也不覆盖 `cardArtwork`。
 
 `GET /api/requests/:id/artwork.svg` 返回制作工具生成的 SVG。草稿与私密需求只对本人开放，不可见时返回 404；公开需求按现有公屏范围读取。响应为私有不缓存，使用 CSP sandbox 与 nosniff。
 
@@ -63,7 +68,7 @@ Request 额外返回 `cardStyle`，枚举以 `shared/card-style.mjs` 为准：th
 ## 上传、交付与卡片管理（2026-11-02）
 
 - `POST /api/requests` body `{}` → `{request}`，建立空草稿，支持先上传再对话。
-- `POST /api/requests/:id/attachments`：multipart 单个 `file` → `{attachment,request,materials,pendingFiles,submissions}`。发布者上传材料；接取者仅进行中/退回时上传待提交成果。草稿/待接取图片材料默认 included=false，文档默认 true；接取后补充材料（含图片）默认 true。
+- `POST /api/requests/:id/attachments`：multipart 单个 `file` → `{attachment,request,materials,pendingFiles,submissions}`。发布者上传材料；接取者仅进行中/退回时上传待提交成果。草稿/待接取图片材料默认 included=false，文档默认 true；接取后补充材料（含图片）默认 true。可选查询参数 `?purpose=cover|reward` 表示图片专用于卡片背景或报酬展示：服务端立即设为对应展示图，并同时关闭 `included` 和 AI 阅读，图片不会作为材料上传给 Dify。
 - `PATCH /api/requests/:id/attachments/:fileId` body `{included:boolean}`；`DELETE` 同地址软移除本人附件。原始材料在接取后锁定，已提交成果也锁定；可补充新文件。
 - `POST /api/requests/:id/cover` body `{attachmentId:string|null}`：仅本人草稿，选择本需求本人上传图片；null 恢复插画/默认背景。
 - 公开卡片 `PATCH /api/requests/:id` 可带 `coverAttachmentId:string|null`，与 confirmed=true 一并确认后更换背景。
@@ -85,13 +90,17 @@ Request 增加 `cardCover`、本人 `selectedCoverId`、`materialFileCount`、�
 
 `POST /api/clarify` 请求不变，服务端仅选本人当前草稿 aiEnabled 的材料；本轮最多10个，文档最多50MB，图片预览最多10MB，合计最多100MB。新上传超出10个的附件保留但不自动启用，手动启用超限返回AI_FILE_LIMIT。先以同一 `momoyu-<user-id>` 上传到Dify `/files/upload`，再通过 `files:[{type,transfer_method:'local_file',upload_file_id}]` 发给 `/chat-messages`。引用缓存按附件、密钥/地址scope、用户三重隔离，缓存不返回网页。Dify更换应用配置后自动使用新scope。所有输入读取完成后才发起模型请求；数量、大小或上游失败不追加消息，不覆盖草稿。
 
-明确上传背景指令不向模型传入图片内容；“根据截图内容整理卡片”不构成背景授权，模型未获授权返回的coverAttachmentId被忽略。当前已选背景也不参与阅读。材料、背景及仅交付附件的用途会写入提示词。取消阅读仅限制未来传入，不能收回当前Dify会话中已读取的内容。
+明确上传背景指令不向模型传入图片内容；“根据截图内容整理卡片”不构成背景授权，模型未获授权返回的coverAttachmentId被忽略。当前已选背景也不参与阅读。材料、背景及仅交付附件的用途会写入提示词。取消阅读仅限制未来传入，不能收回当前Dify会话中已读取的内容。卡片分支默认只接收文件名、附件信息和本地生成的 `attachmentDigests` 摘要（文本/Word/PPT/Excel 最多240字，图片只给尺寸，视频和二进制不给内容），后端不上传附件字节；只有用户明确要求查看、读取、分析、翻译或核对附件内容时才放行文件并通过卡片工具的 `materials` 传入。需要按内容生成译文或文件时由办公文件助手处理。
 
 可读类型当前为图片、PDF、DOC/DOCX、XLS/XLSX、PPT/PPTX、TXT/CSV/MD/JSON/XML。格式解析与视觉能力依赖Dify配置；加密、扫描和模糊材料应明确报告限制。既有SVG制卡与任务交付权限保持独立。
 
 ## AI办公结果文件（2026-11-02）
 
 `GET /api/requests/:id/messages` 与 `/api/clarify` 的 `messages` 中，助手消息可带 `files: Attachment[]`，每项含 id/name/size/mime/downloadUrl。无结果时省略 files。`GET /api/attachments/:id` 下载仅本人有权读取的结果，其他账号及游客返回404；任务接取者也不自动获得私人AI结果。用户可自行下载后作为任务材料上传。
+
+`/api/clarify` 在调用 Dify 前先用 `server/translation-routing.mjs` 区分翻译任务：含 `User Texts` 工作表且至少两个可编辑语言列的 XLSX 是 `project-text`；Word、PDF、TXT、Markdown、PPT、普通 XLSX 是 `document`；无附件是 `text`；附件不可翻译是 `unsupported`。只有用户明确要求翻译（如“翻译成英文”“目标语言：de-DE”“把第 3 段翻译一下”）才进入翻译流程，卡片/协作/审阅措辞优先。`document`、`text` 和 `unsupported` 强制走办公文件助手；`project-text` 仍由后端直接调用工作流，按语言列只填空单元格，已有译文和 `*` 参考列不动，结果写回 XLSX 副本并通过 `messages[].files` 返回。目标语言优先取用户消息；未说明时按表头推断，恰好一个可编辑列仍有空单元格时使用该列，多个空列时列出表头并追问。同时有项目文本和其他文档时项目文本优先，回复会注明其余文件未按列写回。工作流配置见 `DIFY_TRANSLATION_BASE_URL`、`DIFY_TRANSLATION_API_KEY`。
+
+消息以 `/电气` 或 `/电气专家` 开头时，后端直接调用电气专家 Agent，跳过统一入口的任务分发；`/电气` 现在是电气问答和知识库入口，翻译任务若没有项目文本工作簿会转交办公文件助手。`/办公`、`/卡片` 会通过 `forceRoute` 强制进入统一 Chatflow 的办公/卡片分支；本地还会把明确的卡片/求助措辞强制到卡片分支、把明确翻译措辞强制到办公分支。命令说明只显示在 `/` 菜单，不写入对话正文。配置见 `DIFY_ELECTRICAL_BASE_URL`、`DIFY_ELECTRICAL_API_KEY`。
 
 结果仅从实际 `agent_thought` 工具事件里的 public_download_url 收集，最终回复中的链接不作为文件凭据。服务端固定Dify下载主机、禁止重定向、检查签名参数、文件头和本轮随机前缀，再复制到本地私人存储；不向网页返回上游签名或内部引用。每轮最多5份、单份20MB、合计50MB；计入本人250MB空间。
 
@@ -144,3 +153,16 @@ Request 增加 `cardCover`、本人 `selectedCoverId`、`materialFileCount`、�
 - 需求摘要增加`difficulty:{status:'pending'|'scored'|'unavailable',score:null|1..5,reason:string}`及`awardedPoints:null|number`。新卡`rewardPoints`严格1～5整数、默认1，`rewardPolicy`由服务端赋值、客户端不能写。
 - 现有`review`接口approve时在同一事务写积分流水，request_id唯一，重复验收/旧提交不重复给分；changes_requested须反馈并保留版本。完成后本人可archive，积分和双方workspace保留，接取者不能restore。
 - `GET /api/leaderboard?period=month|all`：登录后查看；返回`{period,items:[{rank,userId,displayName,department,points,completedCount,difficultyTotal}],me,totalParticipants}`，最多前100人且另含本人记录，不返回任务ID/私密资料。月份按北京时间，奖励同分按完成数与难度累计排，相同指标并列。
+
+
+### 2026-11-13 对话附件与本地文档翻译
+
+POST /api/clarify新增可选attachmentIds:string[]，最多100个且唯一，必须是本任务本人上传的material，背景/报酬图不能作为本轮新材料。空数组表示没有新增附件，已成功发送的授权引用仍可用于续问；省略为兼容旧客户端。messages中user条目可有attachments快照，待发送附件不属于任何已发消息；删除后快照标为unavailable。失败/取消不写入新消息/递送标记。
+
+完整DOCX/XLSX/文字PDF翻译优先走后端提取及写回，返回仍是assistant消息files私人下载。模型仅接受document_payload_json分批文字，格式及限制见DOCUMENT-TRANSLATION.md。
+
+新上传附件默认开启独立材料范围，续问延续当前任务；明确点名旧文件、补充或对比时可使用相关旧材料。原件与旧成果保留，不默认合并所有已发附件。只读内容概览后端提取文本并经Chatflow快速问答，失败、截断和支持范围见DOCUMENT-TRANSLATION.md。
+
+原生文件Agent路径：office_text包含本轮inputs、outputHistory和output_prefix，经办公Workflow工具的task_json直接交给Agent；原件下载、编辑、回读、上传仍在Dify执行。dify-file-ref统一采用带填充URL-safe Base64，旧引用续改时规范化；输出仍复制到本机私有存储并鉴权下载。修改办公Workflow发布版本后须同步工作流工具，避免网页执行缓存旧版。
+
+卡片分支已改为Dify文档提取→LLM→字段校验，原卡片Agent保留回退。统一入口新增可选card_materials（当前任务授权文档引用，最多5份），子工作流每轮复用缓存引用，父会话不重复挂载已递送文件，不上传历史任务文件。included与aiEnabled独立，禁止读取、仅保存、背景图片及当前无能力理解的图片/视频不进入文档提取。卡片显式deadline:null会清空旧日期。范围与实测见CARD-ASSISTANT-2026-11-13.md。

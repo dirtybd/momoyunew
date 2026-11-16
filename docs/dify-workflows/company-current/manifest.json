@@ -1,0 +1,104 @@
+{
+  "agents": [
+    {
+      "id": "01a1c474-578c-7231-b39a-77fdcc106678",
+      "name": "摸摸鱼·电气专家",
+      "snapshot": "01a1e24a-4f96-7adf-9c88-66b643551302",
+      "thinking": false
+    },
+    {
+      "id": "01a1be12-5635-75ea-a53b-999168ed7156",
+      "name": "摸摸鱼·办公助手",
+      "snapshot": "01a1e24a-5217-7077-b7a3-675647a51b7e",
+      "thinking": false
+    },
+    {
+      "id": "01a1be0f-4a5a-77a4-8bcc-9250b4a6d096",
+      "name": "摸摸鱼·互助卡片助手",
+      "snapshot": "01a1e233-ef5a-728d-b779-5ad147cebf38",
+      "thinking": false
+    },
+    {
+      "id": "01a1be0e-b7af-71b4-9d08-60b34757fc1d",
+      "name": "摸摸鱼·情感支持助手",
+      "snapshot": "01a1d3ef-0322-74a9-98e2-37761f00a344",
+      "thinking": false
+    }
+  ],
+  "workflows": [
+    {
+      "id": "7bdf5e5a-a3b0-44fc-91c0-0af72217fa76",
+      "name": "摸摸鱼·卡片执行",
+      "published": true,
+      "toolSynced": true,
+      "file": "docs/dify-workflows/company-current/card.yml"
+    },
+    {
+      "id": "f8cac963-43bc-4a11-8d6e-46febe4660ae",
+      "name": "摸摸鱼·统一对话入口",
+      "published": true,
+      "toolSynced": null,
+      "file": "docs/dify-workflows/company-current/chatflow.yml"
+    },
+    {
+      "id": "ea03cf8a-0eeb-44c6-8b3c-867009cc7eda",
+      "name": "摸摸鱼·办公执行",
+      "published": true,
+      "toolSynced": true,
+      "file": "docs/dify-workflows/company-current/office.yml"
+    },
+    {
+      "id": "dbb12404-802a-4c78-b48d-83deb79c2b21",
+      "name": "摸摸鱼·电气知识库问答",
+      "published": true,
+      "toolSynced": true,
+      "file": "docs/dify-workflows/company-current/electrical-knowledge.yml"
+    },
+    {
+      "id": "f8786866-073a-4146-a6e3-1e9950b4d991",
+      "name": "摸摸鱼·电气项目文本翻译",
+      "published": true,
+      "toolSynced": true,
+      "file": "docs/dify-workflows/company-current/translation.yml"
+    },
+    {
+      "id": "8abb344f-7bca-4d6a-ad54-83878054bc4c",
+      "name": "摸摸鱼·情感支持",
+      "published": true,
+      "toolSynced": null,
+      "file": "docs/dify-workflows/company-current/care.yml"
+    },
+    {
+      "id": "60294b89-9bad-45b2-8d92-7ba43e645a81",
+      "name": "摸摸鱼·文档修改规划",
+      "published": true,
+      "toolSynced": true,
+      "file": "docs/dify-workflows/company-current/document-edit-plan.yml"
+    },
+    {
+      "id": "84a54936-5f8d-439e-8ae1-47e03a031eb3",
+      "name": "摸摸鱼·文档内容复核",
+      "published": true,
+      "toolSynced": true,
+      "file": "docs/dify-workflows/company-current/document-content-review.yml"
+    },
+    {
+      "id": "efaa3238-e8fd-4d48-9f56-049955e6d41a",
+      "name": "摸摸鱼·文档设计规划",
+      "published": true,
+      "toolSynced": true,
+      "file": "docs/dify-workflows/company-current/document-plan.yml"
+    },
+    {
+      "id": "71655631-13b8-448c-96e0-1bb75ff6adf5",
+      "name": "摸摸鱼·人员匹配",
+      "published": true,
+      "toolSynced": null,
+      "file": "docs/dify-workflows/company-current/matching.yml"
+    }
+  ],
+  "llmDraftNodes": 15,
+  "llmPublishedNodes": 15,
+  "provider": "company-compatible",
+  "model": "momoyu-card-qwen-fast-20261113"
+}

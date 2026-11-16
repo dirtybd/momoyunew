@@ -4,14 +4,27 @@ import {FILE_LIMITS} from '../../shared/attachment-limits.mjs';
 import {FilePicker} from './Attachments.jsx';
 import {DEMO_CARE_POSTS} from '../../shared/demo-care-posts.mjs';
 import './Care.css';
+import './CareDetail.css';
+import './CareBento.css';
 
 const kinds={vent:'吐槽',moment:'随手拍',mood:'心情'};
+const bentoVariants=['feature','photo','note','photo2','quote','note2'];
+const detailLayouts={auto:'自动（按帖子选择）',polaroid:'拍立得',stage:'表情包舞台',magazine:'杂志跨页'};
+const detailLayoutKeys=['polaroid','stage','magazine'];
 const date=v=>new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'long',day:'numeric'}).format(new Date(v));
 const publicNotice='文字与媒体对同事可见。匿名只隐藏身份，请检查画面中的人脸、工牌和文件；文字会经过 AI 审核。';
-const blank=()=>({title:'',content:'',kind:'vent',photos:[],commentsEnabled:true});
-const payload=value=>({title:value.title.trim()||value.content.trim().split('\n')[0].slice(0,40)||'今天的随手拍',content:value.content.trim(),kind:value.kind||'mood',mediaIds:(value.photos||[]).map(p=>p.id),commentsEnabled:value.commentsEnabled!==false,confirmed:true});
-
+const blank=()=>({title:'',content:'',kind:'vent',photos:[],commentsEnabled:true,detailLayout:'auto'});
+const payload=value=>({title:value.title.trim()||value.content.trim().split('\n')[0].slice(0,40)||'今天的随手拍',content:value.content.trim(),kind:value.kind||'mood',mediaIds:(value.photos||[]).map(p=>p.id),commentsEnabled:value.commentsEnabled!==false,detailLayout:value.detailLayout||'auto',confirmed:true});
 const isVideo=p=>p.kind==='video';
+function stableHash(value=''){let h=0;for(let i=0;i<value.length;i++)h=(h*31+value.charCodeAt(i))|0;return Math.abs(h);}
+export function resolveCareLayout(post){
+  const explicit=post?.detailLayout||post?.detail_layout;
+  const photos=post?.photos||[],hasMedia=photos.length>0,imageFirst=hasMedia&&!isVideo(photos[0]);
+  const auto=!hasMedia?'magazine':post.kind==='vent'?(imageFirst?'stage':'magazine'):post.kind==='moment'?'polaroid':detailLayoutKeys[stableHash(String(post.id||''))%detailLayoutKeys.length];
+  const layout=detailLayoutKeys.includes(explicit)?explicit:auto;
+  return layout==='stage'&&!imageFirst?'magazine':layout;
+}
+
 function MediaThumb({media,alt}){return isVideo(media)?<VideoThumb/>:<img src={media.url} alt={alt} loading="lazy"/>}
 function MediaNotice({photos=[]}){return <><p className="field-hint">{publicNotice}</p>{photos.some(isVideo)&&<p className="field-hint">视频不供AI读取，也不做画面审核，请自行检查将公开的内容。</p>}</>}
 function PhotoPicker({photos=[],onChange,disabled=false,onBusy}){
@@ -31,14 +44,17 @@ function PhotoPicker({photos=[],onChange,disabled=false,onBusy}){
   </div>;
 }
 
-function PostFields({value,onChange,disabled,onBusy}){
-  return <div className="care-post-fields">
-    <div className="care-kind-picker" role="group" aria-label="帖子分类">{Object.entries(kinds).map(([key,label])=><button type="button" aria-pressed={(value.kind||'mood')===key} disabled={disabled} key={key} onClick={()=>onChange({...value,kind:key})}>{label}</button>)}</div>
+function PostFields({value,onChange,disabled,onBusy,compact=false}){
+  return <div className={'care-post-fields'+(compact?' is-compact':'')}>
+    <div className="care-post-meta-row">
+      <div className="care-kind-picker" role="group" aria-label="帖子分类">{Object.entries(kinds).map(([key,label])=><button type="button" aria-pressed={(value.kind||'mood')===key} disabled={disabled} key={key} onClick={()=>onChange({...value,kind:key})}>{label}</button>)}</div>
+      {!compact&&<label className="care-layout-field">展开样式<select disabled={disabled} value={value.detailLayout||'auto'} onChange={e=>onChange({...value,detailLayout:e.target.value})}>{Object.entries(detailLayouts).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>}
+    </div>
     <label className="field">标题（可选）<input maxLength={120} value={value.title} disabled={disabled} onChange={e=>onChange({...value,title:e.target.value})} placeholder="给今天起个标题"/></label>
-    <label className="field">想说的话<textarea rows="5" maxLength={1500} value={value.content} disabled={disabled} onChange={e=>onChange({...value,content:e.target.value})} placeholder="吐个槽，记件小事，或留一段此刻的心情…"/></label>
+    <label className="field">想说的话<textarea rows={compact?3:5} maxLength={1500} value={value.content} disabled={disabled} onChange={e=>onChange({...value,content:e.target.value})} placeholder="吐个槽，记件小事，或留一段此刻的心情…"/></label>
     <PhotoPicker photos={value.photos} onChange={photos=>onChange({...value,photos})} disabled={disabled} onBusy={onBusy}/>
     <label className="check"><input type="checkbox" disabled={disabled} checked={value.commentsEnabled!==false} onChange={e=>onChange({...value,commentsEnabled:e.target.checked})}/> 允许鼓励留言</label>
-    <MediaNotice photos={value.photos}/>
+    {compact?<p className="field-hint care-compact-notice">照片会公开；匿名不替照片脱敏；照片不做画面审核。</p>:<MediaNotice photos={value.photos}/>}
   </div>;
 }
 
@@ -46,10 +62,11 @@ function PublishPreview({value}){
   return <div className="care-publish-preview"><h3>{payload(value).title}</h3>{value.content&&<p>{value.content}</p>}{!!value.photos?.length&&<div className="care-publish-photos">{value.photos.map((p,i)=>isVideo(p)?<VideoPlayer key={p.id} src={p.url} label={'将公开的视频 '+(i+1)}/>:<img key={p.id} src={p.url} alt={'将公开的照片 '+(i+1)}/>)}</div>}<p>{value.commentsEnabled===false?'留言已关闭':'允许鼓励留言'}</p></div>;
 }
 
-function PostComposer({initial,api,Modal,onClose,onDone}){
-  const [value,setValue]=useState(()=>initial?{...initial,photos:initial.photos||[]}:blank()),[review,setReview]=useState(false),[busy,setBusy]=useState(false),[uploading,setUploading]=useState(false),[error,setError]=useState('');
-  async function publish(){setBusy(true);setError('');try{const d=await api(initial?'/care/posts/'+initial.id:'/care/posts',{method:initial?'PATCH':'POST',body:payload(value)});onDone(d.post);}catch(e){setError(e.message);}finally{setBusy(false);}}
-  return <Modal title={review?'确认发布':initial?'编辑帖子':'发一条'} className="care-composer-dialog" onClose={()=>!busy&&!uploading&&onClose()}>
+function PostComposer({initial,initialValue,api,Modal,onClose,onDone}){
+  const editing=!!initial?.id;
+  const [value,setValue]=useState(()=>initial?{...initial,photos:initial.photos||[],detailLayout:initial.detailLayout||initial.detail_layout||'auto'}:initialValue?{...initialValue,photos:initialValue.photos||[],detailLayout:initialValue.detailLayout||'auto'}:blank()),[review,setReview]=useState(false),[busy,setBusy]=useState(false),[uploading,setUploading]=useState(false),[error,setError]=useState('');
+  async function publish(){setBusy(true);setError('');try{const d=await api(editing?'/care/posts/'+initial.id:'/care/posts',{method:editing?'PATCH':'POST',body:payload(value)});onDone(d.post);}catch(e){setError(e.message);}finally{setBusy(false);}}
+  return <Modal title={review?'确认发布':editing?'编辑帖子':'发一条'} className="care-composer-dialog" onClose={()=>!busy&&!uploading&&onClose()}>
     {error&&<p className="inline-error" role="alert">{error}</p>}
     {review?<><MediaNotice photos={value.photos}/><PublishPreview value={value}/></>:<PostFields value={value} onChange={setValue} disabled={busy||uploading} onBusy={setUploading}/>}
     <div className="dialog-actions"><button className="secondary" disabled={busy||uploading} onClick={()=>review?setReview(false):onClose()}>{review?'返回修改':'取消'}</button><button className="primary" disabled={busy||uploading||(!value.content.trim()&&!value.photos.length)} onClick={()=>review?publish():setReview(true)}>{busy?'正在审核并发布…':review?'确认发布':'预览'}</button></div>
@@ -69,7 +86,7 @@ function PhotoGallery({photos,title}){
 
 function LikeButton({post,user,onLogin,api,onChanged}){
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
- return <div className="care-like-control"><button type="button" className={'care-like-button'+(post.liked?' is-liked':'')} aria-pressed={!!post.liked} aria-label={post.isDemo?'演示帖不参与点赞':post.liked?'取消点赞':'点赞'} disabled={busy||post.isDemo} onClick={async()=>{if(!user){onLogin();return}setBusy(true);setError('');try{const d=await api('/care/posts/'+post.id+'/like',{method:'PUT',body:{liked:!post.liked}});onChanged(d.post)}catch(e){setError(e.message)}finally{setBusy(false)}}}>赞 {post.likeCount||0}</button>{error&&<span className="inline-error" role="alert">{error}</span>}</div>;
+ return <div className="care-like-control"><button type="button" className={'care-like-button'+(post.liked?' is-liked':'')} aria-pressed={!!post.liked} aria-label={post.isDemo?'演示帖不参与点赞':post.liked?'取消点赞':'点赞'} disabled={busy||post.isDemo} onClick={async()=>{if(!user){onLogin();return}setBusy(true);setError('');try{const d=await api('/care/posts/'+post.id+'/like',{method:'PUT',body:{liked:!post.liked}});onChanged(d.post)}catch(e){setError(e.message)}finally{setBusy(false)}}}><span className="care-like-icon" aria-hidden="true">{post.liked?'♥':'♡'}</span><span className="care-like-word">赞</span><span className="care-like-count">{post.likeCount||0}</span></button>{error&&<span className="inline-error" role="alert">{error}</span>}</div>;
 }
 function PostReader({post,items,api,Modal,onClose,onSelect,onChanged,onEdit,onLogin,user}){
   const [comments,setComments]=useState([]),[cursor,setCursor]=useState(null),[text,setText]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[confirm,setConfirm]=useState(null),[reason,setReason]=useState(''),[notice,setNotice]=useState('');
@@ -77,10 +94,18 @@ function PostReader({post,items,api,Modal,onClose,onSelect,onChanged,onEdit,onLo
   async function load(next=false){const d=await api('/care/posts/'+post.id+'/comments'+(next&&cursor?'?cursor='+cursor:''));setComments(old=>next?[...old,...d.items]:d.items);setCursor(d.nextCursor);}
   useEffect(()=>{setComments([]);setCursor(null);setText('');setError('');setConfirm(null);setNotice('');if(!demo)load().catch(e=>setError(e.message));},[post.id]);
   async function act(fn){setBusy(true);setError('');try{await fn();}catch(e){setError(e.message);}finally{setBusy(false);}}
-  return <Modal title={demo?'图文示例':'摸鱼空间 · 帖子'} className="care-reader-dialog" onClose={onClose}><div className="care-reader">
-    <div className="care-reader-media"><PhotoGallery photos={post.photos||[]} title={post.title}/></div>
-    <div className="care-reader-copy"><div className="care-post-byline"><span className="care-author-mark" aria-hidden="true">⌁</span><div><strong>{demo?'图文示例':'匿名同事'}</strong><span>{kinds[post.kind]||'心情'} · {date(post.createdAt)}</span></div></div>
-      <article className="care-post-body"><h3>{post.title}</h3><p>{post.content}</p></article><LikeButton post={post} user={user} onLogin={onLogin} api={api} onChanged={onChanged}/>
+  const photos=post.photos||[],layout=resolveCareLayout(post),imageFirst=photos.length>0&&!isVideo(photos[0]),hasVideo=photos.some(isVideo);
+  const gallery=<PhotoGallery photos={photos} title={post.title}/>;
+  const likeButton=<LikeButton post={post} user={user} onLogin={onLogin} api={api} onChanged={onChanged}/>;
+  const media=layout==='polaroid'
+    ?<div className="care-reader-media care-polaroid-stage"><figure className={'care-polaroid'+(hasVideo?' is-video':'')}>{imageFirst&&<span className="care-polaroid-tape" aria-hidden="true"/>}{photos.length>1&&<span className="care-polaroid-count">{photos.length} 项</span>}{imageFirst&&<span className="care-media-badge">用户上传 · 表情包</span>}<div className="care-polaroid-photo">{gallery}</div><figcaption className="care-polaroid-caption" aria-hidden="true"><span className="care-hand">{post.title}</span>{imageFirst&&<span className="care-save-chip">存图 ↓</span>}</figcaption></figure></div>
+    :layout==='stage'
+    ?<div className="care-reader-media care-stage-media"><span className="care-stage-corner">摸鱼空间 · 表情包专场{photos.length>1?' · '+photos.length+' 项':''}</span><span className="care-media-badge">用户上传 · 表情包</span><div className="care-stage-bubble" aria-hidden="true"><h3>{post.title}</h3>{post.content&&<p>{post.content.trim().split('\n')[0].slice(0,80)}</p>}</div><div className="care-stage-sticker">{gallery}</div><div className="care-stage-reactions">{likeButton}<span className="care-save-chip">存图 ↓</span></div></div>
+    :<div className="care-reader-media care-magazine-media"><div className="care-magazine-frame">{gallery}</div>{photos.length>0&&<span className="care-detail-count">{photos.length} 项媒体</span>}<span className="care-magazine-pageno" aria-hidden="true">{String((index>=0?index:0)+1).padStart(2,'0')} / {String(Math.max(items.length,1)).padStart(2,'0')}</span></div>;
+  return <Modal title={demo?'图文示例':'摸鱼空间 · 帖子'} className="care-reader-dialog" onClose={onClose}><div className={'care-reader care-reader--'+layout} data-layout={layout}>
+    {media}
+    <div className={'care-reader-copy care-copy--'+layout}><div className="care-post-byline"><span className="care-author-mark" aria-hidden="true">⌁</span><div><strong>{demo?'图文示例':'匿名同事'}</strong><span>{kinds[post.kind]||'心情'} · {date(post.createdAt)}</span></div></div>
+      <article className="care-post-body"><h3>{post.title}</h3><p>{post.content}</p></article>{layout!=='stage'&&likeButton}
       {demo&&<p className="field-hint">示例内容，不代表真实员工动态。你也可以发一条自己的图文。</p>}
       {post.isMine&&!demo&&<div className="care-actions"><button className="text-button" disabled={busy||user?.muted} onClick={()=>onEdit(post)}>编辑</button><button className="text-button" disabled={busy} onClick={()=>setConfirm({type:'comments'})}>{post.commentsEnabled?'关闭留言':'开启留言'}</button>{!isAdmin&&<button className="text-button" onClick={()=>setConfirm({type:'archive'})}>移除帖子</button>}</div>}
       {isAdmin&&!demo&&<div className="care-actions"><button className="text-button" disabled={busy} onClick={()=>{setReason('');setConfirm({type:'admin-archive'})}}>删除帖子</button></div>}
@@ -94,34 +119,111 @@ function PostReader({post,items,api,Modal,onClose,onSelect,onChanged,onEdit,onLo
   </div><div className="care-reader-navigation"><button className="secondary" disabled={index<=0||busy} onClick={()=>onSelect(items[index-1])}>← 上一篇</button><span>{demo?'示例':'匿名分享'}</span><button className="secondary" disabled={index<0||index>=items.length-1||busy} onClick={()=>onSelect(items[index+1])}>下一篇 →</button></div></Modal>;
 }
 
-export function CareBoard({user,sessionReady,onLogin,onStartCare,onBrowse,api,Modal,compact=false}){
-  const [items,setItems]=useState([]),[cursor,setCursor]=useState(null),[filter,setFilter]=useState(''),[loading,setLoading]=useState(false),[error,setError]=useState(''),[selected,setSelected]=useState(null),[composer,setComposer]=useState(null),[notice,setNotice]=useState('');
+function BentoCard({post,variant,user,onOpen,onLogin,api,onLiked}){
+  const photos=post.photos||[],hasMedia=photos.length>0,demo=post.isDemo,kind=kinds[post.kind]||'心情';
+  const meme=hasMedia&&/meme|card-backgrounds\/meme/i.test(photos[0]?.url||'');
+  const accent=variant==='quote'?' is-quote':variant==='note2'?' is-daily':'';
+  const meta=<div className="care-bento-meta"><span>{demo?'示例':'匿名同事'} · {kind}</span></div>;
+  let body;
+  if(hasMedia){
+    body=<>
+      {variant==='feature'&&<span className="care-bento-feature-badge">{meme?'表情包 · 今日份':'今日份'}</span>}
+      <div className="care-bento-media">{photos.length>1&&<span className="care-bento-count">{photos.length} 项</span>}<MediaThumb media={photos[0]} alt={post.title}/></div>
+      <div className="care-bento-caption"><strong>{post.title}</strong>{variant==='feature'&&post.content?<p>{post.content}</p>:null}{meta}</div>
+    </>;
+  }else if(variant==='quote'){
+    body=<><div className="care-bento-quote"><span className="care-quote-mark" aria-hidden="true">“</span><h3>{post.title}</h3><p>{post.content}</p></div><div className="care-bento-caption is-text">{meta}</div></>;
+  }else if(variant==='note2'){
+    body=<><div className="care-bento-daily"><span className="care-bento-kind">今日份 · {kind}</span><h3>{post.title}</h3><p>{post.content}</p></div><div className="care-bento-caption is-text">{meta}</div></>;
+  }else{
+    body=<><div className="care-bento-note"><span className="care-bento-kind">{kind}</span><h3>{post.title}</h3><p>{post.content}</p></div><div className="care-bento-caption is-text">{meta}</div></>;
+  }
+  return <article className={'care-bento-card bento-'+variant+(hasMedia?' has-media':' is-text')+(meme?' is-meme':'')+accent} data-kind={post.kind}>
+    <button type="button" className="care-bento-open" onClick={()=>onOpen(post)} title={post.title}>{body}</button>
+    <div className="care-bento-actions"><LikeButton post={post} user={user} onLogin={onLogin} api={api} onChanged={onLiked}/><button type="button" className="care-bento-comment" onClick={()=>onOpen(post)} aria-label={`查看 ${post.commentCount||0} 条鼓励留言`}><svg className="care-comment-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3.5h10v6.5H8.2L5 13v-3H3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span>{post.commentCount||0}</span></button></div>
+  </article>;
+}
+
+function CareSideComposer({user,disabled,onPreview,onLogin,resetKey}){
+  const [value,setValue]=useState(blank()),[uploading,setUploading]=useState(false);
+  useEffect(()=>setValue(blank()),[resetKey]);
+  if(!user)return <section className="care-side-composer"><div className="care-side-head"><h2>发一条</h2><span>登录后发布</span></div><div className="care-side-fake"><span>给今天起个标题</span><span className="fake-area">吐个槽，记件小事，或留一段此刻的心情…</span></div><button type="button" className="primary" onClick={onLogin}>登录 / 注册</button></section>;
+  if(user.muted)return <section className="care-side-composer"><div className="care-side-head"><h2>发一条</h2></div><p className="care-side-hint">账号已禁言，暂不能公开发帖；仍可私下聊聊。</p></section>;
+  const can=!!value.content.trim()||value.photos.length>0;
+  return <section className="care-side-composer"><div className="care-side-head"><h2>发一条</h2><span>文字会经过 AI 审核</span></div><PostFields compact value={value} onChange={setValue} disabled={disabled||uploading} onBusy={setUploading}/><button type="button" className="primary care-side-publish" disabled={disabled||uploading||!can} onClick={()=>can&&onPreview(value)}>预览并发布 →</button></section>;
+}
+
+export function CareBoard({user,sessionReady,onLogin,onStartCare,api,Modal}){
+  const [items,setItems]=useState([]),[cursor,setCursor]=useState(null),[filter,setFilter]=useState(''),[loading,setLoading]=useState(false),[error,setError]=useState(''),[selected,setSelected]=useState(null),[composer,setComposer]=useState(null),[composerKey,setComposerKey]=useState(0),[notice,setNotice]=useState('');
   async function load(next=false,quiet=false){if(!user)return;if(!quiet)setLoading(true);setError('');try{const params=new URLSearchParams();if(filter)params.set('kind',filter);if(next&&cursor)params.set('cursor',cursor);const d=await api('/care/posts?'+params);setItems(old=>next?[...old,...d.items.filter(x=>!old.some(y=>y.id===x.id))]:d.items);setCursor(d.nextCursor);}catch(e){setError(e.message);}finally{setLoading(false);}}
   useEffect(()=>{setItems([]);setCursor(null);if(user)load();},[user?.id,filter]);
   useEffect(()=>{if(!user||selected||composer)return;const id=setInterval(()=>{if(document.visibilityState==='visible')load(false,true);},30000);return()=>clearInterval(id);},[user?.id,filter,!!selected,!!composer]);
-  const samples=DEMO_CARE_POSTS.filter(p=>!filter||p.kind===filter),all=[...items,...samples.slice(0,Math.max(0,(compact?3:6)-items.length))],shown=compact?all.slice(0,3):all;
+  const sampleOrder=['demo-care-fish','demo-care-coast','demo-care-vent','demo-care-mountain','demo-care-mood','demo-care-small'];
+  const samples=DEMO_CARE_POSTS.filter(p=>!filter||p.kind===filter).sort((a,b)=>sampleOrder.indexOf(a.id)-sampleOrder.indexOf(b.id)),all=[...items,...samples.slice(0,Math.max(0,6-items.length))];
   async function open(item){setError('');if(item.isDemo){setSelected(item);return;}try{setSelected((await api('/care/posts/'+item.id)).post);}catch(e){setError(e.message);}}
   const changed=post=>{if(post){setSelected(post);setItems(old=>old.map(p=>p.id===post.id?post:p));}else load();};
   const liked=post=>{setItems(old=>old.map(p=>p.id===post.id?post:p));setSelected(old=>old?.id===post.id?post:old)};
   const startPost=()=>{if(!user){onLogin();return;}if(user.muted){setError('账号已禁言，暂不能公开发帖或留言；仍可私下聊聊。');return;}setComposer({});};
-  const Heading=compact?'h2':'h1';
-  const tilt=e=>{if(e.pointerType!=='mouse'||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;const el=e.currentTarget,r=el.getBoundingClientRect();el.style.setProperty('--tilt-x',`${-(e.clientY-r.top-r.height/2)/r.height*3}deg`);el.style.setProperty('--tilt-y',`${(e.clientX-r.left-r.width/2)/r.width*3}deg`)};
-  const resetTilt=e=>{e.currentTarget.style.removeProperty('--tilt-x');e.currentTarget.style.removeProperty('--tilt-y')};
-  return <section className={'care-board community-feed'+(compact?' is-compact':'')} aria-label="摸鱼空间"><header className="care-feed-heading"><div><Heading>摸鱼空间</Heading><p>工作之外的一小会儿，留给生活。</p></div><div>{compact?<button className="text-button" onClick={onBrowse}>逛逛摸鱼空间 ↗</button>:<button className="secondary care-mobile-private" onClick={()=>user?onStartCare():onLogin()}>私下聊聊</button>}<button className="primary" disabled={!sessionReady} onClick={startPost}>发一条</button></div></header>
-    {!compact&&<div className="care-feed-filters" role="group" aria-label="心情分类">{[['','全部'],...Object.entries(kinds)].map(([key,label])=><button key={key} aria-pressed={filter===key} onClick={()=>setFilter(key)}>{label}</button>)}<button className="text-button care-refresh" disabled={loading||!user} onClick={()=>load()}>刷新</button></div>}
+  const previewComposer=value=>{if(!user){onLogin();return;}if(user.muted){setError('账号已禁言，暂不能公开发帖或留言；仍可私下聊聊。');return;}setComposer(value);};
+  return <section className="care-board community-feed" aria-label="摸鱼空间">
+    <header className="care-feed-heading"><div><h1>摸鱼空间</h1><p>工作之外的一小会儿，留给生活。</p></div><div><button className="secondary care-header-private" onClick={()=>user?onStartCare():onLogin()}>私下聊聊</button><button className="primary care-header-compose" disabled={!sessionReady} onClick={startPost}>＋ 发一条</button></div></header>
+    <div className="care-feed-filters" role="group" aria-label="心情分类">{[['','全部'],...Object.entries(kinds)].map(([key,label])=><button key={key} aria-pressed={filter===key} onClick={()=>setFilter(key)}>{label}</button>)}<div className="care-feed-tools"><span>{all.length} 条动态</span><button type="button" className="text-button" disabled={loading||!user} onClick={()=>load()}>刷新</button></div></div>
     {error&&<p className="inline-error" role="alert">{error} <button className="text-button" onClick={()=>load()}>重试</button></p>}{notice&&<p className="care-success" role="status">{notice}</p>}
-    <div className={compact?'care-layout compact-layout':'care-layout'}><div className="care-wall">{loading&&!items.length?<div className="care-feed-loading" role="status">正在看看大家的新动态…</div>:<div className={'care-feed-grid'+(shown.length<3?' is-pair':'')}>{shown.map(post=><article className={'care-feed-card'+(!post.photos?.length?' is-text':'')} key={post.id} data-kind={post.kind} onPointerMove={tilt} onPointerLeave={resetTilt} onBlur={resetTilt}><button className="care-card-open" onClick={()=>open(post)} title={post.title}>
-      {post.photos?.length?<div className="care-feed-cover"><MediaThumb media={post.photos[0]} alt={post.title}/>{post.photos.length>1&&<span>{post.photos.length} 项</span>}</div>:<div className="care-feed-text"><span>{kinds[post.kind]||'心情'}</span><h3>{post.title}</h3><p>{post.content}</p></div>}
-      <div className="care-feed-caption">{post.photos?.length?<strong>{post.title}</strong>:null}<div><span>{post.isDemo?'示例':'匿名同事'} · {kinds[post.kind]||'心情'}</span><span>{post.isDemo?'查看图文':post.commentCount+' 条鼓励'} ↗</span></div></div>
-    </button><div className="care-card-footer"><LikeButton post={post} user={user} onLogin={onLogin} api={api} onChanged={liked}/></div></article>)}</div>}
-    {!compact&&cursor&&<button className="secondary care-load-more" disabled={loading} onClick={()=>load(true)}>看看更多</button>}</div>{!compact&&<aside className="care-space-rail"><div className="care-rail-note"><span className="care-rail-line" aria-hidden="true">⌁</span><h2>也可以，只聊聊。</h2><p>不想公开的心事，留在自己的对话里。</p><button className="secondary" onClick={()=>user?onStartCare():onLogin()}>私下聊聊 <span aria-hidden="true">↗</span></button></div><p className="care-rail-foot">分享前看看照片里，<br/>有没有不想公开的人与事。</p></aside>}</div>
+    <div className="care-bento-layout">
+      <div className="care-bento-main">
+        {loading&&!items.length?<div className="care-feed-loading" role="status">正在看看大家的新动态…</div>:<div className="care-bento-grid">{all.map((post,i)=><BentoCard key={post.id} post={post} variant={bentoVariants[i%bentoVariants.length]} user={user} onOpen={open} onLogin={onLogin} api={api} onLiked={liked}/>)}</div>}
+        <div className="care-bento-more">{loading?'正在加载…':cursor?<button type="button" className="secondary" onClick={()=>load(true)}>加载更多动态</button>:<span>已经到底了</span>}<span className="care-bento-total">已显示 {all.length} 条</span></div>
+      </div>
+      <aside className="care-side">
+        <CareSideComposer user={user} disabled={!sessionReady||loading} onPreview={previewComposer} onLogin={onLogin} resetKey={composerKey}/>
+        <section className="rail-card rail-note"><span className="wave">〰</span><strong>也可以，只聊聊。</strong><p>不想公开的心事，留在自己的对话里。</p><button type="button" className="secondary" onClick={()=>user?onStartCare():onLogin()}>私下聊聊 ↗</button></section>
+        <button type="button" className="rail-card care-game-entry" onClick={()=>setNotice('真的摸鱼正在准备中，先留个入口。')}><span className="care-game-icon" aria-hidden="true">🎮</span><span className="care-game-copy"><strong>真的摸鱼</strong><small>小游戏 · 即将开放</small></span><span className="care-game-arrow" aria-hidden="true">↗</span></button>
+        <section className="rail-card"><h3>分享前</h3><p className="care-side-note">看看照片里，有没有不想公开的人、工牌和文件。匿名只隐藏身份，不替照片脱敏。</p></section>
+      </aside>
+    </div>
     {selected&&<PostReader post={selected} items={all} api={api} Modal={Modal} user={user} onLogin={onLogin} onClose={()=>setSelected(null)} onSelect={open} onChanged={changed} onEdit={p=>{setSelected(null);setComposer(p);}}/>}
-    {composer&&<PostComposer initial={composer.id?composer:null} api={api} Modal={Modal} onClose={()=>setComposer(null)} onDone={post=>{setComposer(null);setNotice('已发布到摸鱼空间。');setFilter('');setItems(old=>[post,...old.filter(p=>p.id!==post.id)]);}}/>}
+    {composer&&<PostComposer initial={composer.id?composer:null} initialValue={composer.id?null:composer} api={api} Modal={Modal} onClose={()=>setComposer(null)} onDone={post=>{setComposer(null);setNotice('已发布到摸鱼空间。');setFilter('');setItems(old=>[post,...old.filter(p=>p.id!==post.id)]);setComposerKey(k=>k+1);}}/>}
   </section>;
 }
 
-export function CarePreview({value,onChange,onClose,onPublish,busy}){
-  const [uploading,setUploading]=useState(false);return <section className="preview care-preview"><div className="panel-head"><h2>心情帖预览</h2><button className="icon" onClick={onClose} aria-label="收起匿名倾诉">×</button></div><div className="edit-fields"><PostFields value={value} onChange={onChange} disabled={busy||uploading} onBusy={setUploading}/><button className="primary" disabled={busy||uploading||(!value.content.trim()&&!value.photos?.length)} onClick={onPublish}>预览并确认发布</button></div></section>;
+export function careBlank(){return {title:'',content:'',kind:'vent',photos:[],commentsEnabled:true,detailLayout:'auto'};}
+export function CareStudio({value,onChange,onClose,onPublish,busy}){
+  const [uploading,setUploading]=useState(false);
+  const photos=value.photos||[];
+  const patch=next=>onChange({...value,...next});
+  const ready=Boolean(String(value.content||'').trim()||photos.length);
+  const kindLabel=kinds[value.kind]||'心情';
+  return <section className="card-studio care-studio" aria-label="倾诉卡设计">
+    <header className="cs-head">
+      <div className="cs-title"><span className="cs-mark care-mark" aria-hidden="true">〰</span><div><h2>倾诉卡设计</h2><small>{busy?'AI 正在整理…':'匿名展示 · 确认后才会发布'}</small></div></div>
+      <button type="button" className="cs-close" aria-label="收起倾诉卡" onClick={onClose}>×</button>
+    </header>
+    <div className="cs-body">
+      <article className="live-card card-canvas cs-card care-card card-theme-mint card-layout-standard card-radius-soft card-emphasis-normal card-background-none card-shape-standard">
+        <div className="live-top cs-meta">
+          <span className="cs-meta-left"><b className="cs-kind cs-kind-care">{kindLabel}</b><i className="cs-dot" aria-hidden="true"/><span>匿名展示</span></span>
+          <span>{photos.length?`${photos.length} 项照片`:'仅文字'}</span>
+        </div>
+        <label className="cs-card-field cs-card-title"><span>标题</span><textarea rows="1" maxLength="120" disabled={busy||uploading} value={value.title||''} onChange={e=>patch({title:e.target.value.replace(/\n/g,' ')})} placeholder="给今天起个标题（可选）"/></label>
+        <label className="cs-card-field"><span>想说的话</span><textarea rows="4" maxLength="1500" disabled={busy||uploading} value={value.content||''} onChange={e=>patch({content:e.target.value})} placeholder="吐个槽，记件小事，或留一段此刻的心情…"/></label>
+        {photos.length>0&&<div className="care-card-photos">{photos.map((p,i)=><figure key={p.id}><MediaThumb media={p} alt={'待发布媒体 '+(i+1)}/>{i===0&&<figcaption>封面</figcaption>}</figure>)}</div>}
+        <div className="live-bottom cs-tags"><span className="cs-tag accent">{kindLabel}</span><span className={'cs-tag '+(value.commentsEnabled===false?'muted':'mint')}>{value.commentsEnabled===false?'关闭留言':'允许鼓励'}</span>{value.detailLayout&&value.detailLayout!=='auto'&&<span className="cs-tag muted">{detailLayouts[value.detailLayout]}</span>}</div>
+      </article>
+
+      <div className="cs-style-card">
+        <div className="cs-style-row"><span className="cs-label">分类</span><div className="cs-chips">{Object.entries(kinds).map(([key,label])=><button key={key} type="button" disabled={busy} className={value.kind===key?'on':''} onClick={()=>patch({kind:key})}>{label}</button>)}</div></div>
+        <div className="cs-style-row"><span className="cs-label">版式</span><div className="cs-chips">{Object.entries(detailLayouts).map(([key,label])=><button key={key} type="button" disabled={busy} className={(value.detailLayout||'auto')===key?'on':''} onClick={()=>patch({detailLayout:key})}>{label.replace(/（.*?）/,'')}</button>)}</div></div>
+        <div className="cs-style-row"><span className="cs-label">留言</span><label className="cs-check"><input type="checkbox" disabled={busy||uploading} checked={value.commentsEnabled!==false} onChange={e=>patch({commentsEnabled:e.target.checked})}/>允许同事留下鼓励</label></div>
+      </div>
+
+      <div className="care-studio-photos"><PhotoPicker photos={photos} onChange={list=>patch({photos:list})} disabled={busy} onBusy={setUploading}/></div>
+      <p className="cs-hint">匿名只隐藏身份，照片里的人脸、工牌和文件不会被自动遮挡；文字会经过 AI 审核。</p>
+    </div>
+    <footer className="cs-foot">
+      <button type="button" className="secondary cs-save" onClick={onClose}>取消</button>
+      <button type="button" className="primary cs-publish" disabled={busy||uploading||!ready} onClick={onPublish}>{busy?'正在审核并发布…':'预览并发布 →'}</button>
+    </footer>
+  </section>;
 }
 export function CarePublish({value,conversationId,api,Modal,onClose,onDone}){
   const [busy,setBusy]=useState(false),[error,setError]=useState('');return <Modal title="确认发布心情帖" className="care-composer-dialog" onClose={()=>!busy&&onClose()}><MediaNotice photos={value.photos}/><PublishPreview value={value}/>{error&&<p className="inline-error" role="alert">{error}</p>}<div className="dialog-actions"><button className="secondary" disabled={busy} onClick={onClose}>返回修改</button><button className="primary" disabled={busy} onClick={async()=>{setBusy(true);setError('');try{await api('/care/posts',{method:'POST',body:{...payload(value),...(conversationId?{conversationId}:{})}});onDone();}catch(e){setError(e.message);}finally{setBusy(false);}}}>{busy?'正在审核并发布…':'确认发布'}</button></div></Modal>;

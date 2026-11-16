@@ -1,0 +1,346 @@
+{
+  "id": "78950dfc-7af1-4252-89aa-09e4f8e8ca4c",
+  "graph": {
+    "nodes": [
+      {
+        "data": {
+          "selected": false,
+          "title": "用户输入",
+          "type": "start",
+          "variables": [
+            {
+              "allowed_file_extensions": [
+                ".json",
+                ".txt"
+              ],
+              "allowed_file_types": [
+                "custom"
+              ],
+              "allowed_file_upload_methods": [
+                "local_file",
+                "remote_url"
+              ],
+              "default": "",
+              "hide": false,
+              "hint": "",
+              "label": "任务上下文",
+              "options": [],
+              "placeholder": "",
+              "required": true,
+              "type": "file",
+              "variable": "context_file"
+            },
+            {
+              "allowed_file_extensions": [],
+              "allowed_file_types": [
+                "image",
+                "document"
+              ],
+              "allowed_file_upload_methods": [
+                "local_file",
+                "remote_url"
+              ],
+              "default": "",
+              "hide": false,
+              "hint": "",
+              "label": "授权材料",
+              "max_length": 10,
+              "options": [],
+              "placeholder": "",
+              "required": false,
+              "type": "file-list",
+              "variable": "materials"
+            },
+            {
+              "variable": "task_json",
+              "label": "本轮任务正文JSON",
+              "type": "paragraph",
+              "required": false,
+              "max_length": 128000,
+              "default": "",
+              "options": [],
+              "hide": false
+            }
+          ]
+        },
+        "height": 135,
+        "id": "1793842842055",
+        "position": {
+          "x": 80,
+          "y": 282
+        },
+        "positionAbsolute": {
+          "x": 80,
+          "y": 282
+        },
+        "selected": false,
+        "sourcePosition": "right",
+        "targetPosition": "left",
+        "type": "custom",
+        "width": 242,
+        "zIndex": 0
+      },
+      {
+        "data": {
+          "agent_binding": {
+            "binding_type": "roster_agent",
+            "agent_id": "01a1be12-5635-75ea-a53b-999168ed7156",
+            "current_snapshot_id": "01a1e24a-5217-7077-b7a3-675647a51b7e"
+          },
+          "agent_declared_outputs": [
+            {
+              "id": null,
+              "name": "answer_json",
+              "type": "string",
+              "description": "网页协议 JSON 字符串",
+              "required": true,
+              "file": null,
+              "array_item": null,
+              "children": [],
+              "check": null,
+              "failure_strategy": {
+                "retry": {
+                  "enabled": false,
+                  "max_retries": 0,
+                  "retry_interval_ms": 0
+                },
+                "on_failure": "stop",
+                "default_value": null
+              }
+            },
+            {
+              "id": null,
+              "name": "deliverables",
+              "type": "array",
+              "description": "本轮真实上传的交付文件，无成品时为空数组",
+              "required": true,
+              "file": null,
+              "array_item": {
+                "type": "file",
+                "description": null,
+                "children": []
+              },
+              "children": [],
+              "check": null,
+              "failure_strategy": {
+                "retry": {
+                  "enabled": false,
+                  "max_retries": 0,
+                  "retry_interval_ms": 0
+                },
+                "on_failure": "stop",
+                "default_value": null
+              }
+            },
+            {
+              "id": null,
+              "name": "artifact_json",
+              "type": "string",
+              "description": "办公任务始终为空字符串",
+              "required": true,
+              "file": null,
+              "array_item": null,
+              "children": [],
+              "check": null,
+              "failure_strategy": {
+                "retry": {
+                  "enabled": false,
+                  "max_retries": 0,
+                  "retry_interval_ms": 0
+                },
+                "on_failure": "stop",
+                "default_value": null
+              }
+            }
+          ],
+          "agent_node_kind": "dify_agent",
+          "agent_output_routes": {
+            "enabled": false,
+            "routes": []
+          },
+          "agent_task": "本轮任务正文如下；直接阅读文字，仅在明确给出旧入口回退说明时下载上下文文件 {{#office_task_text.output#}} ，并按需下载授权材料 {{#1793842842055.materials#}} 。依据上下文和授权材料完成任务，按声明输出网页协议 JSON、真实交付文件数组与空工件。",
+          "selected": false,
+          "title": "Agent",
+          "type": "agent",
+          "version": "2"
+        },
+        "height": 118,
+        "id": "1793842855615",
+        "position": {
+          "x": 382,
+          "y": 282
+        },
+        "positionAbsolute": {
+          "x": 382,
+          "y": 282
+        },
+        "selected": false,
+        "sourcePosition": "right",
+        "targetPosition": "left",
+        "type": "custom",
+        "width": 242,
+        "zIndex": 0
+      },
+      {
+        "data": {
+          "outputs": [
+            {
+              "value_selector": [
+                "1793842855615",
+                "answer_json"
+              ],
+              "value_type": "string",
+              "variable": "answer_json"
+            },
+            {
+              "value_selector": [
+                "1793842855615",
+                "deliverables"
+              ],
+              "value_type": "array[file]",
+              "variable": "deliverables"
+            },
+            {
+              "value_selector": [
+                "1793842855615",
+                "artifact_json"
+              ],
+              "value_type": "string",
+              "variable": "artifact_json"
+            }
+          ],
+          "selected": true,
+          "title": "输出",
+          "type": "end"
+        },
+        "height": 141,
+        "id": "1793843121231",
+        "position": {
+          "x": 685.5874010714002,
+          "y": 282
+        },
+        "positionAbsolute": {
+          "x": 685.5874010714002,
+          "y": 282
+        },
+        "selected": true,
+        "sourcePosition": "right",
+        "targetPosition": "left",
+        "type": "custom",
+        "width": 242,
+        "zIndex": 0
+      },
+      {
+        "id": "office_task_text",
+        "type": "custom",
+        "position": {
+          "x": 142,
+          "y": 282
+        },
+        "data": {
+          "type": "template-transform",
+          "title": "直接传递任务正文",
+          "desc": "仅拼接任务元数据，文件操作仍由Agent执行",
+          "variables": [
+            {
+              "variable": "task_json",
+              "value_selector": [
+                "1793842842055",
+                "task_json"
+              ]
+            },
+            {
+              "variable": "legacy_id",
+              "value_selector": [
+                "1793842842055",
+                "context_file",
+                "related_id"
+              ]
+            }
+          ],
+          "template": "{% if task_json %}{{ task_json }}{% else %}旧入口未提供任务正文。上下文是local_file，record_id={{ legacy_id }}；使用Python生成带填充的规范dify-file-ref，再下载读取该上下文。{% endif %}"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "data": {
+          "isInIteration": false,
+          "isInLoop": false,
+          "sourceType": "start",
+          "targetType": "template-transform"
+        },
+        "id": "1793842842055-office_task_text",
+        "source": "1793842842055",
+        "sourceHandle": "source",
+        "target": "office_task_text",
+        "targetHandle": "target",
+        "type": "custom",
+        "zIndex": 0
+      },
+      {
+        "data": {
+          "isInIteration": false,
+          "isInLoop": false,
+          "sourceType": "agent",
+          "targetType": "end"
+        },
+        "id": "1793842855615-source-1793843121231-target",
+        "source": "1793842855615",
+        "sourceHandle": "source",
+        "target": "1793843121231",
+        "targetHandle": "target",
+        "type": "custom",
+        "zIndex": 0
+      },
+      {
+        "id": "office_task_text-1793842855615",
+        "source": "office_task_text",
+        "target": "1793842855615",
+        "sourceHandle": "source",
+        "targetHandle": "target",
+        "type": "custom",
+        "data": {
+          "sourceType": "template-transform",
+          "targetType": "agent"
+        }
+      }
+    ],
+    "viewport": {
+      "x": 65.7767257102904,
+      "y": 171.88901611069804,
+      "zoom": 0.6803949917581876
+    }
+  },
+  "features": {
+    "file_upload": {},
+    "retriever_resource": {
+      "enabled": true
+    },
+    "sensitive_word_avoidance": {
+      "enabled": false
+    },
+    "text_to_speech": {
+      "enabled": false,
+      "language": "",
+      "voice": ""
+    }
+  },
+  "hash": "20249ec04d50bdc77bc143850b2904a03d5f85c7423a540f2b389761763840e8",
+  "version": "2026-11-16 02:58:04.183047",
+  "version_number": 22,
+  "marked_name": "",
+  "marked_comment": "",
+  "created_by": {
+    "id": "f6bea3b5-cd67-42a5-84f5-7a1e2cfb1b09",
+    "name": "张明翼",
+    "email": "zhangmingy@cei1958.com"
+  },
+  "created_at": 1794797884,
+  "updated_by": null,
+  "updated_at": 1794797884,
+  "tool_published": true,
+  "environment_variables": [],
+  "conversation_variables": [],
+  "rag_pipeline_variables": []
+}

@@ -43,7 +43,7 @@ test('独立关怀接口审核、匿名、隔离、软移除与限频',async t=>
   assert.equal((await call('/care/posts','GET',undefined,alice.cookie)).data.items.length,0);
   reviewMode='urgent';assert.equal((await call('/care/posts','POST',{title:'合成标题',content:'合成危机模拟',confirmed:true},alice.cookie)).status,422);
   reviewMode='allow';const post=await call('/care/posts','POST',{title:'合成标题',content:'合成倾诉文本',confirmed:true},alice.cookie);assert.equal(post.status,201);
-  assert.deepEqual(Object.keys(post.data.post).sort(),['anonymous','commentCount','commentsEnabled','content','createdAt','id','isMine','kind','likeCount','liked','photos','title','updatedAt'].sort());
+  assert.deepEqual(Object.keys(post.data.post).sort(),['anonymous','commentCount','commentsEnabled','content','createdAt','detailLayout','id','isMine','kind','likeCount','liked','photos','title','updatedAt'].sort());
   assert.equal(post.data.post.anonymous,true);const id=post.data.post.id;
   const view=await call('/care/posts/'+id,'GET',undefined,bob.cookie);assert.equal(view.data.post.isMine,false);assert.ok(!JSON.stringify(view.data).includes('虚拟甲'));
   assert.equal((await call('/care/posts/'+id,'PATCH',{title:'非法修改',confirmed:true},bob.cookie)).status,404);

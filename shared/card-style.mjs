@@ -1,9 +1,11 @@
+import { CARD_BACKGROUNDS, LEGACY_BACKGROUND_ALIASES } from './card-backgrounds.mjs';
+
 export const CARD_STYLE_OPTIONS = Object.freeze({
   theme: ['orange', 'mint', 'ink', 'sand', 'rose', 'sky'],
   layout: ['standard', 'poster', 'note'],
   radius: ['soft', 'square'],
   emphasis: ['normal', 'bold'],
-  background: ['none', 'mountain', 'coast', 'meme'],
+  background: ['none', ...Object.keys(CARD_BACKGROUNDS), ...Object.keys(LEGACY_BACKGROUND_ALIASES)],
   shape: ['standard', 'ticket', 'polaroid', 'bubble'],
   coverPosition: ['center','top','bottom','left','right']
 });

@@ -21,6 +21,7 @@ if not exist "node_modules\vite\bin\vite.js" (
 )
 echo.
 echo Website: http://127.0.0.1:5174/
+echo LAN (same network): use the 192.168/x.x or 172.x.x.x addresses printed below.
 echo Starting Momoyu. Please keep this window open while using the website.
 node scripts/dev.mjs --open
 if errorlevel 1 goto failed

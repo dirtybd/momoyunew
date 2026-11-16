@@ -159,10 +159,15 @@ test("本地完整链路和权限边界", async (t) => {
   const labelAndStyle = await call('/api/clarify', 'POST', {message:'标题：设计卡片\n问题：整理名单\n目标：找出漏项\n交付物：清单\n把卡片改成蓝色便签'}, a.cookie);
   assert.equal(labelAndStyle.data.intent,'request'); assert.equal(labelAndStyle.data.request.title,'设计卡片');
   assert.equal(labelAndStyle.data.request.cardStyle.theme,'sky'); assert.equal(labelAndStyle.data.request.cardStyle.layout,'note');
-  for (const [phrase,background] of [['把卡片背景换成山景','mountain'],['换成海边背景','coast'],['用摸鱼表情包做背景','meme'],['去掉背景图，改成纯色','none'],['换成山峰背景','mountain'],['换成海岸背景','coast']]) {
+  for (const [phrase,background] of [['把卡片背景换成山景','mountain'],['换成海边背景','coast'],['用摸鱼表情包做背景','meme'],['去掉背景图，改成纯色','none'],['换成山峰背景','mountain'],['换成海岸背景','coast'],['把背景换成互助','general'],['换成审阅背景','review'],['把背景换成翻译','translate'],['换成数据报表背景','data'],['把背景换成安全巡检','safety']]) {
     const result = await call('/api/clarify', 'POST', {requestId:help.data.request.id,message:phrase}, a.cookie);
     assert.equal(result.data.intent,'style'); assert.equal(result.data.request.cardStyle.background,background);
   }
+  const keepBackground = await call('/api/clarify', 'POST', {requestId:help.data.request.id,message:'把背景换成互助'}, a.cookie);
+  assert.equal(keepBackground.data.request.cardStyle.background,'general');
+  const cardTypeOnly = await call('/api/clarify', 'POST', {requestId:help.data.request.id,message:'翻译求助卡，把配色改成蓝色'}, a.cookie);
+  assert.equal(cardTypeOnly.data.intent,'style'); assert.equal(cardTypeOnly.data.request.cardStyle.theme,'sky');
+  assert.equal(cardTypeOnly.data.request.cardStyle.background,'general');
   const combination = await call('/api/clarify', 'POST', {requestId:help.data.request.id,message:'把卡片做成海边拍立得'}, a.cookie);
   assert.equal(combination.data.intent,'style'); assert.equal(combination.data.request.cardStyle.background,'coast');
   assert.equal(combination.data.request.cardStyle.shape,'polaroid'); assert.equal(combination.data.request.cardStyle.theme,'sky');
@@ -258,10 +263,9 @@ test("本地完整链路和权限边界", async (t) => {
   const demo = (await call("/api/requests?source=employee")).data.requests.find(
     (x) => x.isDemo,
   );
-  assert.equal(
-    (await call(`/api/requests/${demo.id}/claim`, "POST", {}, b.cookie)).status,
-    200,
-  );
+  const demoClaim = await call(`/api/requests/${demo.id}/claim`, "POST", {}, b.cookie);
+  assert.equal(demoClaim.status, 200);
+  assert.equal(demoClaim.data.request.rewardPoints, demo.rewardPoints, "演示卡使用预设积分，不等待难度评估");
   const mine = await call("/api/me/requests", "GET", null, a.cookie);
   assert.equal(mine.data.requests.length, 1);
 });

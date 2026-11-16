@@ -1,17 +1,21 @@
 import React,{useEffect,useState} from 'react';
 import {TaskEconomy,rewardRule} from './TaskEconomy.jsx';
 import {FileList,FilePicker,uploadAttachment} from './Attachments.jsx';
+import {DemandInteractions} from './DemandDetailLayouts.jsx';
 
 async function call(path,body) {
   const r=await fetch('/api'+path,{method:body?'POST':'GET',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
   const d=await r.json();if(!r.ok)throw new Error(d.error?.message||'操作失败');return d;
 }
-export function TaskDetail({request,onChanged,children}) {
+export function TaskDetail({request,onChanged,children,initialTab='brief',user}) {
   const participant=request.isMine||request.isClaimedByMe;
-  const [tab,setTab]=useState(participant&&(request.isClaimedByMe||['submitted','changes_requested','completed'].includes(request.status))?'work':'brief');
-  const brief=<>{children}{!participant&&request.materialFileCount>0&&<p className="field-hint">有 {request.materialFileCount} 个需求附件，接取后可下载。</p>}</>;
-  if(!participant)return brief;
-  return <><div className="task-detail-tabs"><button type="button" aria-pressed={tab==='brief'} onClick={()=>setTab('brief')}>需求详情</button><button type="button" aria-pressed={tab==='work'} onClick={()=>setTab('work')}>材料与交付{request.canReview?' · 待验收':request.canSubmit?' · 可提交':''}</button></div>{tab==='brief'?brief:<TaskWorkspace request={request} onChanged={onChanged}/>}</>;
+  const canInteract=request.kind!=='announcement';
+  const tabs=participant?['brief','interactions','work']:(canInteract?['brief','interactions']:['brief']);
+  const fallback=participant&&(request.isClaimedByMe||['submitted','changes_requested','completed'].includes(request.status))?'work':'brief';
+  const [tab,setTab]=useState(tabs.includes(initialTab)?initialTab:fallback);
+  useEffect(()=>{setTab(tabs.includes(initialTab)?initialTab:fallback);},[request.id,initialTab]);
+  const brief=<>{typeof children==='function'?children(canInteract?()=>setTab('interactions'):undefined):children}{!participant&&request.materialFileCount>0&&<p className="field-hint">有 {request.materialFileCount} 个需求附件，接取后可下载。</p>}</>;
+  return <>{tabs.length>1&&<div className="task-detail-tabs"><button type="button" aria-pressed={tab==='brief'} onClick={()=>setTab('brief')}>需求详情</button>{canInteract&&<button type="button" aria-pressed={tab==='interactions'} onClick={()=>setTab('interactions')}>提问与留言</button>}{participant&&<button type="button" aria-pressed={tab==='work'} onClick={()=>setTab('work')}>材料与交付{request.canReview?' · 待验收':request.canSubmit?' · 可提交':''}</button>}</div>}{tab==='brief'?brief:tab==='interactions'?<DemandInteractions request={request} user={user} onChanged={onChanged?()=>onChanged(request):undefined}/>:<TaskWorkspace request={request} onChanged={onChanged}/>}</>;
 }
 function TaskWorkspace({request,onChanged}) {
   const [data,setData]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[note,setNote]=useState(''),[feedback,setFeedback]=useState('');

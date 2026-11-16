@@ -30,7 +30,7 @@ export function taskWorkflow({db,files,body,json,card,save,base,activeClarificat
     return {request:card(row,user),materials:sourceFiles(row,user),pendingFiles:row.claimer_id===user.id?files.list(row.id,'deliverable').filter(f=>!f.submission_id).map(files.view):[],submissions:history(row.id)};
   }
   function transaction(fn){db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}}
-  async function handle(req,res,path,user) {
+  async function handle(req,res,path,user,url) {
     const method=req.method;
     if(path==='/api/requests'&&method==='POST'){
       if(!user)fail(401,'UNAUTHORIZED','请先登录');
@@ -77,7 +77,16 @@ export function taskWorkflow({db,files,body,json,card,save,base,activeClarificat
       const f=await files.upload(req,row,user,role);
       row=requireRow(id,user);d=data(row);
       if(d.deletedAt||['completed','cancelled'].includes(d.status)||(role==='deliverable'&&!['claimed','changes_requested'].includes(d.status))){db.prepare('UPDATE attachments SET removed_at=? WHERE id=?').run(new Date().toISOString(),f.id);fail(409,'TASK_CHANGED','任务状态已变化，请刷新后再上传。');}
-      json(res,201,{attachment:files.view(f),...workspace(row,user)});return true;
+      // A dedicated background/reward upload must never enter the AI material set.
+      // Applying it here also keeps it out of the same turn's Dify `files`.
+      const purpose=url?.searchParams?.get('purpose');
+      if(purpose){
+        if(!['cover','reward'].includes(purpose))fail(400,'INVALID_FIELD','上传用途无效');
+        if(d.coverFileId===f.id||d.rewardFileId===f.id)fail(409,'FILE_LOCKED','这张图片已经是卡片展示图。');
+        try{purpose==='cover'?applyCover(row,d,f.id,user):applyReward(row,d,f.id,user);save(row,d);}
+        catch(e){db.prepare('UPDATE attachments SET removed_at=? WHERE id=?').run(new Date().toISOString(),f.id);throw e;}
+      }
+      json(res,201,{attachment:files.view(purpose?files.get(f.id):f),...workspace(get(id),user)});return true;
     }
     if(action==='attachments'&&fileId&&['PATCH','DELETE'].includes(method)){
       const b=method==='PATCH'?await body(req):{};row=requireRow(id,user);d=data(row);if(d.deletedAt)fail(409,'ARCHIVED','请先恢复卡片。');const f=files.get(fileId);
@@ -133,7 +142,7 @@ export function taskWorkflow({db,files,body,json,card,save,base,activeClarificat
       const time=new Date().toISOString();
       transaction(()=>{
         db.prepare('UPDATE submissions SET decision=?,feedback=?,reviewed_at=? WHERE id=?').run(b.decision,b.feedback.trim(),time,latest.id);
-        d.status=b.decision==='approve'?'completed':'changes_requested';if(d.status==='completed'){d.completedAt=time;points.award(row,d,time);}save(row,d);
+        d.status=b.decision==='approve'?'completed':'changes_requested';if(d.status==='completed'){d.completedAt=time;d.deletedAt=time;if(!d.isDemo)points.award(row,d,time);}save(row,d);
       });
       json(res,200,workspace(get(id),user));return true;
     }

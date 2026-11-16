@@ -15,17 +15,18 @@ export function careService({db,body,json,dataDir}) {
     CREATE TABLE IF NOT EXISTS care_rate (user_id TEXT NOT NULL, kind TEXT NOT NULL, created_ms INTEGER NOT NULL);`);
   db.exec('CREATE TABLE IF NOT EXISTS care_likes(post_id TEXT NOT NULL,user_id TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(post_id,user_id))');
   if(!db.prepare('PRAGMA table_info(care_posts)').all().some(c=>c.name==='kind'))db.exec("ALTER TABLE care_posts ADD COLUMN kind TEXT NOT NULL DEFAULT 'mood'");
+  if(!db.prepare('PRAGMA table_info(care_posts)').all().some(c=>c.name==='detail_layout'))db.exec("ALTER TABLE care_posts ADD COLUMN detail_layout TEXT DEFAULT 'auto'");
   for(const table of ['care_posts','care_comments']){
     const columns=db.prepare(`PRAGMA table_info(${table})`).all();
     if(!columns.some(c=>c.name==='moderated_at'))db.exec(`ALTER TABLE ${table} ADD COLUMN moderated_at TEXT`);
     if(!columns.some(c=>c.name==='moderation_reason'))db.exec(`ALTER TABLE ${table} ADD COLUMN moderation_reason TEXT`);
   }
-  const media=careMediaStore(db,dataDir),kinds=['mood','vent','moment'];
+  const media=careMediaStore(db,dataDir),kinds=['mood','vent','moment'],detailLayouts=['auto','polaroid','stage','magazine'];
   const get=(sql,...args)=>db.prepare(sql).get(...args), all=(sql,...args)=>db.prepare(sql).all(...args), run=(sql,...args)=>db.prepare(sql).run(...args);
   const requirePost=id=>{const p=get('SELECT * FROM care_posts WHERE id=? AND removed_at IS NULL AND moderated_at IS NULL',id);if(!p)fail(404,'NOT_FOUND','内容不存在');return p;};
   const ownedPost=(id,user)=>{const p=requirePost(id);if(p.owner_id!==user.id)fail(404,'NOT_FOUND','内容不存在');return p;};
   const isAdmin=user=>{const a=accountAccess(db,user.id);return a.enabled&&a.role!=='employee';};
-  const postView=(p,user)=>({id:p.id,title:p.title,content:p.content,kind:p.kind,photos:media.list(p.id),createdAt:p.created_at,updatedAt:p.updated_at,anonymous:true,isMine:p.owner_id===user.id,commentsEnabled:!!p.comments_enabled,commentCount:get('SELECT count(*) AS n FROM care_comments WHERE post_id=? AND removed_at IS NULL AND moderated_at IS NULL',p.id).n,likeCount:get('SELECT count(*) AS n FROM care_likes WHERE post_id=?',p.id).n,liked:!!get('SELECT 1 FROM care_likes WHERE post_id=? AND user_id=?',p.id,user.id)});
+  const postView=(p,user)=>({id:p.id,title:p.title,content:p.content,kind:p.kind,detailLayout:p.detail_layout||'auto',photos:media.list(p.id),createdAt:p.created_at,updatedAt:p.updated_at,anonymous:true,isMine:p.owner_id===user.id,commentsEnabled:!!p.comments_enabled,commentCount:get('SELECT count(*) AS n FROM care_comments WHERE post_id=? AND removed_at IS NULL AND moderated_at IS NULL',p.id).n,likeCount:get('SELECT count(*) AS n FROM care_likes WHERE post_id=?',p.id).n,liked:!!get('SELECT 1 FROM care_likes WHERE post_id=? AND user_id=?',p.id,user.id)});
   const commentView=(c,p,user)=>({id:c.id,content:c.content,authorLabel:c.owner_id===p.owner_id?'发布者':'匿名同事',isMine:c.owner_id===user.id,canRemove:c.owner_id===user.id||p.owner_id===user.id||isAdmin(user),createdAt:c.created_at});
   const cursor=url=>{const v=url.searchParams.get('cursor');if(v!==null&&!/^[1-9]\d{0,14}$/.test(v))fail(400,'INVALID_CURSOR','游标无效');return v?Number(v):Number.MAX_SAFE_INTEGER;};
   const rate=(user,kind)=>{const time=Date.now();run('DELETE FROM care_rate WHERE created_ms<?',time-60000);if(get('SELECT count(*) AS n FROM care_rate WHERE user_id=? AND kind=?',user.id,kind).n>=5)fail(429,'RATE_LIMIT','操作过于频繁，请稍后再试');run('INSERT INTO care_rate VALUES (?,?,?)',user.id,kind,time);};
@@ -49,12 +50,12 @@ export function careService({db,body,json,dataDir}) {
     }
     if(path==='/api/care/posts'&&method==='POST'){
       requirePublishing(db,user.id);
-      const b=await body(req);validBody(b,['title','content','conversationId','commentsEnabled','confirmed','kind','mediaIds']);
+      const b=await body(req);validBody(b,['title','content','conversationId','commentsEnabled','confirmed','kind','mediaIds','detailLayout']);
       if(b.confirmed!==true)fail(400,'CONFIRM_REQUIRED','请确认公开发布');
-      const ids=b.mediaIds??[],kind=b.kind??'mood';media.validate(ids,user.id);
-      if(!text(b.title,120)||typeof b.content!=='string'||b.content.length>1500||(!b.content.trim()&&!ids.length)||!kinds.includes(kind)||(b.commentsEnabled!==undefined&&typeof b.commentsEnabled!=='boolean'))fail(400,'INVALID_FIELD','请填写标题，并提供文字或照片');
+      const ids=b.mediaIds??[],kind=b.kind??'mood',detailLayout=b.detailLayout??'auto';media.validate(ids,user.id);
+      if(!text(b.title,120)||typeof b.content!=='string'||b.content.length>1500||(!b.content.trim()&&!ids.length)||!kinds.includes(kind)||!detailLayouts.includes(detailLayout)||(b.commentsEnabled!==undefined&&typeof b.commentsEnabled!=='boolean'))fail(400,'INVALID_FIELD','请填写标题，并提供文字或照片');
       checkConversation(b.conversationId,user);rate(user,'post');await review('care_post',b.title.trim(),b.content.trim());checkConversation(b.conversationId,user);
-      requirePublishing(db,user.id);const id=randomUUID(),time=new Date().toISOString();db.exec('BEGIN IMMEDIATE');try{media.validate(ids,user.id);run('INSERT INTO care_posts (id,owner_id,title,content,comments_enabled,created_at,updated_at,kind) VALUES (?,?,?,?,?,?,?,?)',id,user.id,b.title.trim(),b.content.trim(),b.commentsEnabled===false?0:1,time,time,kind);media.bind(ids,user.id,id);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
+      requirePublishing(db,user.id);const id=randomUUID(),time=new Date().toISOString();db.exec('BEGIN IMMEDIATE');try{media.validate(ids,user.id);run('INSERT INTO care_posts (id,owner_id,title,content,comments_enabled,created_at,updated_at,kind,detail_layout) VALUES (?,?,?,?,?,?,?,?,?)',id,user.id,b.title.trim(),b.content.trim(),b.commentsEnabled===false?0:1,time,time,kind,detailLayout);media.bind(ids,user.id,id);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
       json(res,201,{post:postView(requirePost(id),user)});return true;
     }
     const p=path.match(/^\/api\/care\/posts\/([^/]+)(?:\/(archive|comments))?$/);
@@ -62,14 +63,14 @@ export function careService({db,body,json,dataDir}) {
       if(!action&&method==='GET'){json(res,200,{post:postView(requirePost(id),user)});return true;}
       if(!action&&method==='PATCH'){
         requirePublishing(db,user.id);
-        const b=await body(req);validBody(b,['title','content','commentsEnabled','confirmed','kind','mediaIds']);if(b.confirmed!==true)fail(400,'CONFIRM_REQUIRED','请确认修改');
+        const b=await body(req);validBody(b,['title','content','commentsEnabled','confirmed','kind','mediaIds','detailLayout']);if(b.confirmed!==true)fail(400,'CONFIRM_REQUIRED','请确认修改');
         let current=ownedPost(id,user);
-        const ids=b.mediaIds??media.list(id).map(m=>m.id),kind=b.kind??current.kind;media.validate(ids,user.id,id);
-        if(('title'in b&&!text(b.title,120))||('content'in b&&(typeof b.content!=='string'||b.content.length>1500||(!b.content.trim()&&!ids.length)))||!kinds.includes(kind)||('commentsEnabled'in b&&typeof b.commentsEnabled!=='boolean'))fail(400,'INVALID_FIELD','修改内容无效');
+        const ids=b.mediaIds??media.list(id).map(m=>m.id),kind=b.kind??current.kind,detailLayout='detailLayout'in b?b.detailLayout:(current.detail_layout||'auto');media.validate(ids,user.id,id);
+        if(('title'in b&&!text(b.title,120))||('content'in b&&(typeof b.content!=='string'||b.content.length>1500||(!b.content.trim()&&!ids.length)))||!kinds.includes(kind)||!detailLayouts.includes(detailLayout)||('commentsEnabled'in b&&typeof b.commentsEnabled!=='boolean'))fail(400,'INVALID_FIELD','修改内容无效');
         const title='title'in b?b.title.trim():current.title,content='content'in b?b.content.trim():current.content;
         if('title'in b||'content'in b){rate(user,'post');await review('care_post',title,content);const latest=ownedPost(id,user);if(latest.updated_at!==current.updated_at||latest.title!==current.title||latest.content!==current.content||latest.comments_enabled!==current.comments_enabled)fail(409,'POST_CHANGED','内容已变化，请刷新后重试');current=latest;}
         if(!content.trim()&&!ids.length)fail(400,'INVALID_FIELD','请保留文字或照片');
-        requirePublishing(db,user.id);db.exec('BEGIN IMMEDIATE');try{media.bind(ids,user.id,id);run('UPDATE care_posts SET title=?,content=?,comments_enabled=?,updated_at=?,kind=? WHERE id=?',title,content,'commentsEnabled'in b?(b.commentsEnabled?1:0):current.comments_enabled,new Date().toISOString(),kind,id);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
+        requirePublishing(db,user.id);db.exec('BEGIN IMMEDIATE');try{media.bind(ids,user.id,id);run('UPDATE care_posts SET title=?,content=?,comments_enabled=?,updated_at=?,kind=?,detail_layout=? WHERE id=?',title,content,'commentsEnabled'in b?(b.commentsEnabled?1:0):current.comments_enabled,new Date().toISOString(),kind,detailLayout,id);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
         json(res,200,{post:postView(requirePost(id),user)});return true;
       }
       if(action==='archive'&&method==='POST') {const b=await body(req);validBody(b,['confirmed']);if(b.confirmed!==true)fail(400,'CONFIRM_REQUIRED','请确认移除');ownedPost(id,user);run('UPDATE care_posts SET removed_at=? WHERE id=?',new Date().toISOString(),id);json(res,200,{ok:true});return true;}

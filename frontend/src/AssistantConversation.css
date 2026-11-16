@@ -1,0 +1,39 @@
+/* 对话面板：与 A 版一致，标题在左、状态在右，材料和对话一起展示。 */
+.assistant-conversation .chat-head{min-height:58px;padding:13px 20px;align-items:center}
+.assistant-conversation .chat-head h2{font-size:14px;font-weight:600;margin:0;line-height:1.25}
+.chat-sub{display:block;font-size:10px;color:#948a7d;margin-top:2px}
+.chat-status{flex:none;font-size:10px;line-height:1.4;color:#4f6b5b;background:#eef3ef;border:1px solid #dce7df;border-radius:99px;padding:3px 8px;white-space:nowrap}
+.chat-status.busy{color:#a9450b;background:#fff1e4;border-color:#f1d5bc}
+
+.chat-file-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;min-width:0}
+.chat-file-chip{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%;min-height:34px;border:1px solid #e5dcd1;border-radius:4px;background:#fff;padding:5px 8px;text-align:left;text-decoration:none;cursor:pointer}
+a.chat-file-chip:hover{border-color:#b86d37}
+.chat-file-icon{flex:none;width:16px;height:18px;color:#887b6d}
+.chat-file-chip b{display:block;min-width:0;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500;color:#4f4438}
+.chat-file-chip small{flex:none;font-size:14px;color:#766b60;white-space:nowrap}
+.file-saved-only{flex:none;font-size:14px;color:#92400e;white-space:nowrap}
+.chat-file-chip.unavailable{cursor:default}
+.assistant-conversation{position:relative}
+.chat-drop-target{position:absolute;inset:10px;z-index:8;display:flex;align-items:center;justify-content:center;border:2px dashed #c25a20;border-radius:6px;background:#fffaf4;color:#92400e;font-size:18px;pointer-events:none}
+.chat-composer-area{flex:none;min-width:0;border-top:1px solid #eee7de;background:#fcfbf9}
+.assistant-conversation .chat-composer-area .compact-attachments{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px 12px;padding:8px 22px 0;border:0;background:none;overflow:visible}
+.chat-composer-area .compact-attachments .secondary{background:transparent}
+.chat-composer-area .attachment-manage-button{justify-self:end;white-space:nowrap;color:#695b4d;padding:6px 0}
+.chat-composer-area .attachment-manage-button:hover{color:#92400e}
+.chat-composer-area .attachment-limit{font-size:14px;line-height:1.5;color:#766b60}
+.assistant-conversation .chat-composer-area .composer{border:0;background:none}
+.assistant-conversation .composer>div{justify-content:space-between;gap:8px;flex-wrap:wrap}
+.assistant-conversation .composer-shortcut{display:block;min-width:0;font-size:13px;line-height:1.5;color:#6a625b}
+.chat-pending-files{display:flex;align-items:flex-start;gap:10px;max-height:114px;overflow:auto;padding:8px 22px 0}
+.pending-files-label{flex:none;font-size:14px;line-height:34px;color:#766b60;white-space:nowrap}
+.chat-pending-files .chat-file-row{flex:1;margin:0}
+.chat-file-chip.pending{padding:0 0 0 8px;gap:4px;cursor:default}
+.pending-file-info{display:flex;align-items:center;gap:8px;flex:1;min-width:0;min-height:32px;background:none;border:0;padding:4px 0;text-align:left;font:inherit;cursor:pointer}
+.pending-file-remove{flex:none;width:32px;min-height:32px;padding:0;background:none;border:0;border-radius:3px;color:#766b60;font-size:20px;cursor:pointer}
+.pending-file-remove:hover{color:#92400e;background:#f8eee2}
+.pending-file-info:disabled,.pending-file-remove:disabled{opacity:.6;cursor:default}
+.attachment-manager-reading{font-size:14px;color:#695b4d;margin-bottom:12px}
+
+.chat-note{align-self:flex-start;max-width:86%;border:1px dashed #e3d3c1;border-radius:8px;background:#fffdfa;color:#8b8175;font-size:12px;line-height:1.6;padding:9px 12px;margin:0 0 24px}
+
+@media(max-width:700px){.assistant-conversation .chat-head{padding:12px 16px}.assistant-conversation .chat-composer-area .compact-attachments{grid-template-columns:minmax(0,1fr) auto;gap:0 8px;padding:8px 16px 0}.chat-composer-area .attachment-limit{grid-column:1/-1;grid-row:2;padding-top:4px}.chat-pending-files{display:block;max-height:128px;padding:6px 16px 0}.pending-files-label{display:block;line-height:24px}.pending-file-remove{width:44px;min-height:44px}}

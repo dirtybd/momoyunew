@@ -21,6 +21,7 @@ export function taskPoints(db){
     const awarded=db.prepare('INSERT OR IGNORE INTO task_points(request_id,user_id,points,awarded_at) VALUES(?,?,?,?)').run(row.id,row.claimer_id,points,time);if(!awarded.changes)fail('ALREADY_AWARDED','本次积分已经发放，请刷新任务状态');
   }
   const awarded=id=>db.prepare('SELECT points FROM task_points WHERE request_id=?').get(id)?.points??null;
+  const taskView=row=>{let d={};try{d=JSON.parse(row.data||'{}');}catch{}return {requestId:row.request_id,title:(d.title||'已完成的互助').slice(0,200),skills:Array.isArray(d.skills)?d.skills.slice(0,3):[],points:Number(row.points)||0,awardedAt:row.awarded_at};};
   function leaderboard(userId,period='month',now=Date.now()){
     if(!['month','all'].includes(period))throw Object.assign(new Error('请选择本月或总榜'),{status:400,code:'INVALID_PERIOD'});
     const china=new Date(now+8*3600000),start=period==='month'?new Date(Date.UTC(china.getUTCFullYear(),china.getUTCMonth(),1)-8*3600000).toISOString():'0000';
@@ -34,5 +35,34 @@ export function taskPoints(db){
     let rank=0,last;const items=rows.map((r,i)=>{const key=[r.points,r.completedCount,r.difficultyTotal].join(':');if(key!==last)rank=i+1;last=key;const p=JSON.parse(r.profile);return {rank,userId:r.id,displayName:p.displayName,department:p.department,points:r.points,completedCount:r.completedCount,difficultyTotal:r.difficultyTotal};});
     return {period,items:items.slice(0,100),me:items.find(p=>p.userId===userId)||null,totalParticipants:items.length};
   }
-  return {capacity,requireSlot,award,awarded,leaderboard};
+  function overview(userId,now=Date.now()){
+    const total=db.prepare('SELECT coalesce(sum(points),0) AS points,count(*) AS completedCount FROM task_points WHERE user_id=?').get(userId);
+    const china=new Date(now+8*3600000),start=new Date(Date.UTC(china.getUTCFullYear(),china.getUTCMonth(),1)-8*3600000).toISOString(),end=new Date(now).toISOString();
+    const month=db.prepare(`SELECT coalesce(sum(p.points),0) AS points,count(*) AS completedCount,count(distinct r.owner_id) AS owners
+      FROM task_points p LEFT JOIN requests r ON r.id=p.request_id
+      WHERE p.user_id=? AND p.awarded_at>=? AND p.awarded_at<=?`).get(userId,start,end);
+    const recent=db.prepare(`SELECT p.request_id,p.points,p.awarded_at,r.data
+      FROM task_points p LEFT JOIN requests r ON r.id=p.request_id
+      WHERE p.user_id=? ORDER BY p.awarded_at DESC,p.rowid DESC LIMIT 3`).all(userId).map(taskView);
+    const board=leaderboard(userId,'month',now);
+    return {
+      totalPoints:Number(total.points),
+      completedCount:Number(total.completedCount),
+      monthPoints:Number(month.points),
+      monthCompleted:Number(month.completedCount),
+      monthOwners:Number(month.owners),
+      rank:board.me?.rank??null,
+      rankParticipants:board.totalParticipants,
+      recent,
+    };
+  }
+  function history(userId,{limit=200,offset=0}={}){
+    limit=Math.max(1,Math.min(500,Number(limit)||200));offset=Math.max(0,Number(offset)||0);
+    const total=Number(db.prepare('SELECT count(*) AS n FROM task_points WHERE user_id=?').get(userId).n);
+    const items=db.prepare(`SELECT p.request_id,p.points,p.awarded_at,r.data
+      FROM task_points p LEFT JOIN requests r ON r.id=p.request_id
+      WHERE p.user_id=? ORDER BY p.awarded_at DESC,p.rowid DESC LIMIT ? OFFSET ?`).all(userId,limit,offset).map(taskView);
+    return {items,total,limit,offset};
+  }
+  return {capacity,requireSlot,award,awarded,leaderboard,overview,history};
 }

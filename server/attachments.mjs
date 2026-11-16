@@ -11,6 +11,7 @@ const imageExt=/\.(png|jpe?g|webp|gif)$/i;
 const allowed=/\.(png|jpe?g|webp|gif|mp4|webm|mov|pdf|docx?|xlsx?|pptx?|txt|csv|md|json|xml|zip|7z|rar|dwg|dxf|step|stp|stl|s7p|ap\d{2}|zap\d{2}|zef|zw1)$/i;
 const imageMime={jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif'};
 const readable=/\.(png|jpe?g|webp|gif|pdf|docx?|xlsx?|pptx?|txt|csv|md|json|xml)$/i;
+export const usesPreviousMaterials=message=>/(?:上次|上一[份个轮次]|之前|前面|刚才).{0,12}(?:文件|材料|文档|表格|译文|结果|生成|翻译)|(?:继续|接着|补充|一起|合并|对比|比较|结合|同时)/.test(message);
 export function uploadedBackgroundRequested(message) {
   if(/(?:不要|不是|不能|别把|不用于|不作为).{0,30}(?:背景|封面)/.test(message))return false;
   return /(?:用|把|将|拿).{0,80}(?:图片|照片|截图|上传|这张|那张|\.png|\.jpg).{0,35}(?:作|做|当|设为|设置为|换成).{0,8}(?:背景|封面)/i.test(message)||/(?:图片|照片|这张图|那张图).{0,12}(?:作为|用作|设为|做成|当作|做|当).{0,8}(?:背景|封面)/.test(message)||/(?:背景|封面).{0,10}(?:用|换成).{0,40}(?:上传|图片|照片|这张|那张)/.test(message);
@@ -36,6 +37,7 @@ export function attachmentStore(db,dataDir) {
     PRIMARY KEY(attachment_id,scope,user_id)
   )`);
   db.exec('CREATE TABLE IF NOT EXISTS assistant_outputs (message_rowid INTEGER NOT NULL,attachment_id TEXT PRIMARY KEY,native_reference TEXT NOT NULL)');
+  db.exec('CREATE TABLE IF NOT EXISTS dify_file_deliveries(request_id TEXT NOT NULL,scope TEXT NOT NULL,conversation_id TEXT NOT NULL,attachment_id TEXT NOT NULL,PRIMARY KEY(request_id,scope,conversation_id,attachment_id))');
   const root=resolve(dataDir,'uploads');
   const usedBytes=userId=>storageUsed(db,userId);
   const get=id=>db.prepare('SELECT * FROM attachments WHERE id=? AND removed_at IS NULL').get(id);
@@ -85,10 +87,10 @@ export function attachmentStore(db,dataDir) {
     res.writeHead(200,{'Content-Type':preview?'image/webp':f.mime,'Content-Length':bytes.length,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Disposition':preview?'inline':`attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(f.name)}`});
     res.end(bytes);
   }
-  async function aiInputs(row,user,scope,{skipImages=false}={}) {
+  async function aiInputs(row,user,scope,{skipImages=false,ids}={}) {
     if(row.owner_id!==user.id||JSON.parse(row.data).status!=='draft')fail(403,'FORBIDDEN','只能读取本人的草稿材料。');
     const d=JSON.parse(row.data),visualIds=[d.coverFileId,d.rewardFileId];
-    const selected=list(row.id,'material').filter(f=>f.ai_enabled&&!visualIds.includes(f.id)&&!(skipImages&&f.preview_key));
+    const selected=list(row.id,'material').filter(f=>f.ai_enabled&&(ids===undefined||ids.includes(f.id))&&!visualIds.includes(f.id)&&!(skipImages&&f.preview_key));
     if(selected.length>limits.aiCount)fail(400,'AI_FILE_LIMIT','每轮最多读取10个材料，请在管理附件中调整“AI阅读”。');
     const sizes=await Promise.all(selected.map(f=>stat(resolve(root,f.preview_key||f.storage_key))));
     if(sizes.reduce((sum,f)=>sum+f.size,0)>limits.aiTotalBytes)fail(413,'AI_TOTAL_SIZE','本轮AI阅读材料合计最多100MB，请在管理附件中分批选择。');
@@ -101,8 +103,34 @@ export function attachmentStore(db,dataDir) {
     }));
   }
   const cacheUpload=(id,scope,userId,uploadId)=>db.prepare('INSERT OR REPLACE INTO dify_attachment_uploads VALUES(?,?,?,?)').run(id,scope,userId,uploadId);
+  const wasDelivered=(requestId,scope,conversationId,id)=>!!conversationId&&!!db.prepare('SELECT 1 FROM dify_file_deliveries WHERE request_id=? AND scope=? AND conversation_id=? AND attachment_id=?').get(requestId,scope,conversationId,id);
+  const recordDelivered=(requestId,scope,conversationId,ids)=>{if(conversationId)for(const id of ids||[])db.prepare('INSERT OR IGNORE INTO dify_file_deliveries VALUES(?,?,?,?)').run(requestId,scope,conversationId,id);};
+  const sentIds=requestId=>{const ids=new Set();for(const m of db.prepare("SELECT meta FROM messages WHERE request_id=? AND role='user'").all(requestId)){try{for(const f of JSON.parse(m.meta)?.attachments||[])if(f?.id)ids.add(f.id);}catch{}}return [...ids];};
+  function taskIds(requestId,currentIds,message){
+    const available=list(requestId,'material'),named=available.filter(f=>String(message).includes(f.name)).map(f=>f.id);
+    let latest=[];
+    for(const m of db.prepare("SELECT meta FROM messages WHERE request_id=? AND role='user' ORDER BY rowid DESC").all(requestId)){
+      try{const meta=JSON.parse(m.meta);if(Array.isArray(meta?.taskAttachmentIds)){latest=meta.taskAttachmentIds.filter(id=>available.some(f=>f.id===id));break;}const files=meta?.attachments;if(files?.length){latest=files.map(f=>f.id).filter(id=>available.some(f=>f.id===id));break;}}catch{}
+    }
+    return [...new Set(currentIds.length?[...currentIds,...named,...(usesPreviousMaterials(message)?latest:[])]:named.length?named:latest)];
+  }
+  function taskOutputs(row,user,message,currentIds){
+    const outputs=outputHistory(row,user),named=outputs.filter(f=>String(message).includes(f.name));
+    if(named.length)return named;
+    if(/(?:上次|上一[份个轮次]|之前|刚才).{0,12}(?:生成|译文|成果|结果|输出)|(?:继续|修改).{0,8}(?:译文|生成的文件|成果)/.test(message))return outputs;
+    if(currentIds.length)return [];
+    const latest=db.prepare("SELECT rowid,meta FROM messages WHERE request_id=? AND role='user' ORDER BY rowid DESC").all(row.id).find(m=>{try{return JSON.parse(m.meta)?.attachments?.length;}catch{return false;}});
+    return outputs.filter(f=>!latest||db.prepare('SELECT message_rowid FROM assistant_outputs WHERE attachment_id=?').get(f.id)?.message_rowid>latest.rowid);
+  }
   const messageFiles=rowid=>db.prepare('SELECT a.* FROM assistant_outputs o JOIN attachments a ON a.id=o.attachment_id WHERE o.message_rowid=? AND a.removed_at IS NULL ORDER BY a.rowid').all(rowid).map(view);
-  const outputHistory=(row,user)=>row.owner_id===user.id?db.prepare('SELECT a.name,o.native_reference AS reference FROM assistant_outputs o JOIN attachments a ON a.id=o.attachment_id WHERE a.request_id=? AND a.removed_at IS NULL ORDER BY a.rowid DESC LIMIT 8').all(row.id):[];
+  const outputHistory=(row,user)=>row.owner_id===user.id?db.prepare('SELECT a.id,a.name,o.native_reference AS reference FROM assistant_outputs o JOIN attachments a ON a.id=o.attachment_id WHERE a.request_id=? AND a.removed_at IS NULL ORDER BY a.rowid DESC LIMIT 8').all(row.id):[];
+  async function readOutput(id,row,user,scope){
+    const f=get(id);
+    if(!f||f.role!=='assistant'||f.request_id!==row.id||row.owner_id!==user.id||f.uploader_id!==user.id)fail(404,'NOT_FOUND','此前生成的文件不存在或不可读取。');
+    if(f.size>20*1024*1024)fail(413,'OUTPUT_TOO_LARGE','此前生成的文件超过续改读取限制。');
+    const cached=db.prepare('SELECT upload_id FROM dify_attachment_uploads WHERE attachment_id=? AND scope=? AND user_id=?').get(f.id,scope,user.id);
+    return {name:f.name,mime:f.mime,uploadId:cached?.upload_id,bytes:cached?undefined:await readFile(resolve(root,f.storage_key))};
+  }
   async function stageOutputs(row,user,outputs=[]) {
     if(row.owner_id!==user.id)fail(403,'FORBIDDEN','只能保存本人的处理结果。');
     const staged=[];await mkdir(root,{recursive:true});
@@ -119,5 +147,5 @@ export function attachmentStore(db,dataDir) {
       }};
     }catch(e){await rollback();throw e;}
   }
-  return {get,list,view,upload,canRead,serve,aiInputs,cacheUpload,messageFiles,outputHistory,stageOutputs};
+  return {get,list,view,upload,canRead,serve,aiInputs,cacheUpload,wasDelivered,recordDelivered,sentIds,taskIds,taskOutputs,messageFiles,outputHistory,readOutput,stageOutputs};
 }

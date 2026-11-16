@@ -3,10 +3,11 @@ import {VideoAttachment,isVideoFile} from './Media.jsx';
 import {FILE_LIMITS} from '../../shared/attachment-limits.mjs';
 
 export const bytesLabel=value=>value<1024*1024?`${Math.ceil(value/1024)} KB`:`${(value/1024/1024).toFixed(1)} MB`;
-export async function uploadAttachment(requestId,file) {
+export async function uploadAttachment(requestId,file,purpose) {
   const video=isVideoFile(file);if(file.size>(video?FILE_LIMITS.videoBytes:FILE_LIMITS.uploadBytes))throw new Error(`${file.name} 超过${video?'200':'50'}MB。`);
   const body=new FormData();body.append('file',file);
-  const response=await fetch(`/api/requests/${requestId}/attachments`,{method:'POST',credentials:'same-origin',body});
+  const query=purpose?`?purpose=${encodeURIComponent(purpose)}`:'';
+  const response=await fetch(`/api/requests/${requestId}/attachments${query}`,{method:'POST',credentials:'same-origin',body});
   const data=await response.json();if(!response.ok)throw new Error(data.error?.message||'上传失败');return data;
 }
 export function FilePicker({onFiles,disabled,label='上传图片或文件',imagesOnly=false,mediaOnly=false,multiple=true}) {

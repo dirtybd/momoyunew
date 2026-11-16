@@ -1,4 +1,10 @@
+> 公司平台现状（2026-11-13）：视觉复核已按用户要求移除，下面旧的四工具/视觉闭环仅为历史参考，不能重新导入当前工作区。当前只使用三个文字规划/复核工具；质量Skill可提供本地渲染供人工预览，不能声称AI看图验收。当前公司图见company-chatflow-published.json、company-office-published.json和company-translation-published.json。文件Agent已准备私有Python环境；DeepSeek候选整链未通过，生产保留原Qwen模型。工具已同步最新发布图；原生导入包不含Home依赖，见 ../../deployment/OFFICE-AGENT-RUNTIME.md。超时定位、原生文件实测与未解决范围见 ../FILE-AGENT-TIMEOUT-2026-11-13.md。
+
 # 文档工作流与质量 Skill
+
+全局模型策略（2026-11-13）：摸摸鱼4个Agent及10个已发布流程已统一显式关闭思考，已发布图、编辑草稿和工具版本均核对。当前导出见 `company-current/manifest.json`，参数机制、回退与限制见 [非思考配置记录](../NON-THINKING-2026-11-13.md)。他人维护的EPLAN草稿不在范围内。
+
+卡片分支现已使用固定LLM流程，最新可导入DSL为 `company-card-llm.yml`；文档提取、连续材料引用、同源需求规范及原Agent回退说明见 [卡片助手记录](../CARD-ASSISTANT-2026-11-13.md)。以下Office文档工作流说明不代表卡片仍在运行Agent。
 
 状态：2026-11-03已在本机Dify导入并发布四个文档Workflow，作为工具挂到原“摸摸鱼”Agent；document-quality-work与原office-file-work配合。LibreOffice、Poppler和中文字体已部署为可重建的沙箱镜像。完整验收证据与范围以[验证记录](../VALIDATION.md)为准；PPT-MASTER尚未安装。
 
