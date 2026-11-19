@@ -15,6 +15,7 @@ import { difyConfig, clarifyWithDify } from './dify.mjs';
 import {attachmentStore,uploadedBackgroundRequested,usesPreviousMaterials} from './attachments.mjs';
 import {taskWorkflow} from './task-workflow.mjs';
 import {careService} from './care.mjs';
+import {canteenService} from './canteen.mjs';
 import {matchingService,defaultPreferences,validatePreferences,verifyMatchToken} from './matching.mjs';
 import {accountSchema,accountAccess,requirePublishing} from './accounts.mjs';
 import {adminService} from './admin.mjs';
@@ -447,6 +448,7 @@ function clarify(d, message) {
 }
 const workflow=taskWorkflow({db,files:attachments,body,json,card,save,base,activeClarifications,points,difficulty,wakeBackground});
 const care=careService({db,body,json,dataDir});
+const canteen=canteenService({db,body,json,dataDir});
 const officialMedia=officialMediaStore({db,dataDir,json});
 const profileApi=profileService({dataDir,get,run,json,points,userView});
 const admin=adminService({db,body,json,base,save,matching,activeClarifications,officialMedia,points,difficulty,wakeBackground});
@@ -516,7 +518,7 @@ const server = createServer(async (req, res) => {
       const origin = req.headers.origin;
       if (origin && origin !== `http://${req.headers.host}`)
         fail(403, "INVALID_ORIGIN", "请求来源不被允许");
-      const multipartUpload=req.method==='POST'&&(/^\/api\/requests\/[^/]+\/attachments$/.test(path)||path==='/api/care/media'||path==='/api/admin/official/media'||path==='/api/profile/avatar')&&/^multipart\/form-data;/.test(req.headers['content-type']||'');
+      const multipartUpload=req.method==='POST'&&(/^\/api\/requests\/[^/]+\/attachments$/.test(path)||path==='/api/care/media'||/^\/api\/canteen\/items\/[^/]+\/photos$/.test(path)||path==='/api/admin/official/media'||path==='/api/profile/avatar')&&/^multipart\/form-data;/.test(req.headers['content-type']||'');
       if (!multipartUpload&&
         !/^application\/json(?:\s*;|\s*$)/i.test(
           req.headers["content-type"] || "",
@@ -554,6 +556,7 @@ const server = createServer(async (req, res) => {
     if(path==='/api/leaderboard'&&method==='GET'){requireUser(user);return json(res,200,points.leaderboard(user.id,url.searchParams.get('period')||'month'));}
     if(path==='/api/me/task-limits'&&method==='GET'){requireUser(user);return json(res,200,points.capacity(user.id));}
     if(await engagement.handle(req,res,path,method,user))return;
+    if(await canteen.handle(req,res,url,user))return;
     if(await care.handle(req,res,url,user))return;
     if(await workflow.handle(req,res,path,user,url))return;
     const agentIcon=path.match(/^\/api\/agents\/(product-[a-z0-9]+)\/icon$/i);

@@ -6,6 +6,7 @@ import {DEMO_CARE_POSTS} from '../../shared/demo-care-posts.mjs';
 import './Care.css';
 import './CareDetail.css';
 import './CareBento.css';
+import {CanteenBoard,GamesBoard} from './Canteen.jsx';
 
 const kinds={vent:'吐槽',moment:'随手拍',mood:'心情'};
 const bentoVariants=['feature','photo','note','photo2','quote','note2'];
@@ -144,45 +145,37 @@ function BentoCard({post,variant,user,onOpen,onLogin,api,onLiked}){
   </article>;
 }
 
-function CareSideComposer({user,disabled,onPreview,onLogin,resetKey}){
-  const [value,setValue]=useState(blank()),[uploading,setUploading]=useState(false);
-  useEffect(()=>setValue(blank()),[resetKey]);
-  if(!user)return <section className="care-side-composer"><div className="care-side-head"><h2>发一条</h2><span>登录后发布</span></div><div className="care-side-fake"><span>给今天起个标题</span><span className="fake-area">吐个槽，记件小事，或留一段此刻的心情…</span></div><button type="button" className="primary" onClick={onLogin}>登录 / 注册</button></section>;
-  if(user.muted)return <section className="care-side-composer"><div className="care-side-head"><h2>发一条</h2></div><p className="care-side-hint">账号已禁言，暂不能公开发帖；仍可私下聊聊。</p></section>;
-  const can=!!value.content.trim()||value.photos.length>0;
-  return <section className="care-side-composer"><div className="care-side-head"><h2>发一条</h2><span>文字会经过 AI 审核</span></div><PostFields compact value={value} onChange={setValue} disabled={disabled||uploading} onBusy={setUploading}/><button type="button" className="primary care-side-publish" disabled={disabled||uploading||!can} onClick={()=>can&&onPreview(value)}>预览并发布 →</button></section>;
-}
-
 export function CareBoard({user,sessionReady,onLogin,onStartCare,api,Modal}){
-  const [items,setItems]=useState([]),[cursor,setCursor]=useState(null),[filter,setFilter]=useState(''),[loading,setLoading]=useState(false),[error,setError]=useState(''),[selected,setSelected]=useState(null),[composer,setComposer]=useState(null),[composerKey,setComposerKey]=useState(0),[notice,setNotice]=useState('');
-  async function load(next=false,quiet=false){if(!user)return;if(!quiet)setLoading(true);setError('');try{const params=new URLSearchParams();if(filter)params.set('kind',filter);if(next&&cursor)params.set('cursor',cursor);const d=await api('/care/posts?'+params);setItems(old=>next?[...old,...d.items.filter(x=>!old.some(y=>y.id===x.id))]:d.items);setCursor(d.nextCursor);}catch(e){setError(e.message);}finally{setLoading(false);}}
-  useEffect(()=>{setItems([]);setCursor(null);if(user)load();},[user?.id,filter]);
-  useEffect(()=>{if(!user||selected||composer)return;const id=setInterval(()=>{if(document.visibilityState==='visible')load(false,true);},30000);return()=>clearInterval(id);},[user?.id,filter,!!selected,!!composer]);
+  const [items,setItems]=useState([]),[cursor,setCursor]=useState(null),[channel,setChannel]=useState('feed'),[loading,setLoading]=useState(false),[error,setError]=useState(''),[selected,setSelected]=useState(null),[composer,setComposer]=useState(null),[notice,setNotice]=useState('');
+  async function load(next=false,quiet=false){if(!user)return;if(!quiet)setLoading(true);setError('');try{const params=new URLSearchParams();if(next&&cursor)params.set('cursor',cursor);const d=await api('/care/posts?'+params);setItems(old=>next?[...old,...d.items.filter(x=>!old.some(y=>y.id===x.id))]:d.items);setCursor(d.nextCursor);}catch(e){setError(e.message);}finally{setLoading(false);}}
+  useEffect(()=>{setItems([]);setCursor(null);if(user)load();},[user?.id]);
+  useEffect(()=>{if(!user||selected||composer||channel!=='feed')return;const id=setInterval(()=>{if(document.visibilityState==='visible')load(false,true);},30000);return()=>clearInterval(id);},[user?.id,!!selected,!!composer,channel]);
   const sampleOrder=['demo-care-fish','demo-care-coast','demo-care-vent','demo-care-mountain','demo-care-mood','demo-care-small'];
-  const samples=DEMO_CARE_POSTS.filter(p=>!filter||p.kind===filter).sort((a,b)=>sampleOrder.indexOf(a.id)-sampleOrder.indexOf(b.id)),all=[...items,...samples.slice(0,Math.max(0,6-items.length))];
+  const samples=[...DEMO_CARE_POSTS].sort((a,b)=>sampleOrder.indexOf(a.id)-sampleOrder.indexOf(b.id)),all=[...items,...samples.slice(0,Math.max(0,6-items.length))];
   async function open(item){setError('');if(item.isDemo){setSelected(item);return;}try{setSelected((await api('/care/posts/'+item.id)).post);}catch(e){setError(e.message);}}
   const changed=post=>{if(post){setSelected(post);setItems(old=>old.map(p=>p.id===post.id?post:p));}else load();};
   const liked=post=>{setItems(old=>old.map(p=>p.id===post.id?post:p));setSelected(old=>old?.id===post.id?post:old)};
   const startPost=()=>{if(!user){onLogin();return;}if(user.muted){setError('账号已禁言，暂不能公开发帖或留言；仍可私下聊聊。');return;}setComposer({});};
-  const previewComposer=value=>{if(!user){onLogin();return;}if(user.muted){setError('账号已禁言，暂不能公开发帖或留言；仍可私下聊聊。');return;}setComposer(value);};
   return <section className="care-board community-feed" aria-label="摸鱼空间">
-    <header className="care-feed-heading"><div><h1>摸鱼空间</h1><p>工作之外的一小会儿，留给生活。</p></div><div><button className="secondary care-header-private" onClick={()=>user?onStartCare():onLogin()}>私下聊聊</button><button className="primary care-header-compose" disabled={!sessionReady} onClick={startPost}>＋ 发一条</button></div></header>
-    <div className="care-feed-filters" role="group" aria-label="心情分类">{[['','全部'],...Object.entries(kinds)].map(([key,label])=><button key={key} aria-pressed={filter===key} onClick={()=>setFilter(key)}>{label}</button>)}<div className="care-feed-tools"><span>{all.length} 条动态</span><button type="button" className="text-button" disabled={loading||!user} onClick={()=>load()}>刷新</button></div></div>
-    {error&&<p className="inline-error" role="alert">{error} <button className="text-button" onClick={()=>load()}>重试</button></p>}{notice&&<p className="care-success" role="status">{notice}</p>}
-    <div className="care-bento-layout">
-      <div className="care-bento-main">
-        {loading&&!items.length?<div className="care-feed-loading" role="status">正在看看大家的新动态…</div>:<div className="care-bento-grid">{all.map((post,i)=><BentoCard key={post.id} post={post} variant={bentoVariants[i%bentoVariants.length]} user={user} onOpen={open} onLogin={onLogin} api={api} onLiked={liked}/>)}</div>}
-        <div className="care-bento-more">{loading?'正在加载…':cursor?<button type="button" className="secondary" onClick={()=>load(true)}>加载更多动态</button>:<span>已经到底了</span>}<span className="care-bento-total">已显示 {all.length} 条</span></div>
-      </div>
-      <aside className="care-side">
-        <CareSideComposer user={user} disabled={!sessionReady||loading} onPreview={previewComposer} onLogin={onLogin} resetKey={composerKey}/>
-        <section className="rail-card rail-note"><span className="wave">〰</span><strong>也可以，只聊聊。</strong><p>不想公开的心事，留在自己的对话里。</p><button type="button" className="secondary" onClick={()=>user?onStartCare():onLogin()}>私下聊聊 ↗</button></section>
-        <button type="button" className="rail-card care-game-entry" onClick={()=>setNotice('真的摸鱼正在准备中，先留个入口。')}><span className="care-game-icon" aria-hidden="true">🎮</span><span className="care-game-copy"><strong>真的摸鱼</strong><small>小游戏 · 即将开放</small></span><span className="care-game-arrow" aria-hidden="true">↗</span></button>
-        <section className="rail-card"><h3>分享前</h3><p className="care-side-note">看看照片里，有没有不想公开的人、工牌和文件。匿名只隐藏身份，不替照片脱敏。</p></section>
-      </aside>
+    <header className="care-feed-heading"><div><h1>摸鱼空间</h1><p>吐槽、随手拍、心情都放在这里。工作之外的一小会儿，留给生活。</p></div><div><button className="secondary care-header-private" onClick={()=>user?onStartCare():onLogin()}>私下聊聊</button><button className="primary care-header-compose" disabled={!sessionReady} onClick={startPost}>＋ 发一条</button></div></header>
+    <div className="care-channel-tabs" role="tablist" aria-label="摸鱼空间频道">
+      <button type="button" role="tab" aria-selected={channel==='feed'} className={channel==='feed'?'is-on':''} onClick={()=>setChannel('feed')}>动态</button>
+      <button type="button" role="tab" aria-selected={channel==='canteen'} className={channel==='canteen'?'is-on':''} onClick={()=>setChannel('canteen')}>食堂菜单</button>
+      <button type="button" role="tab" aria-selected={channel==='games'} className={channel==='games'?'is-on':''} onClick={()=>setChannel('games')}>真的摸鱼</button>
     </div>
+    {channel==='feed'&&<>
+      {error&&<p className="inline-error" role="alert">{error} <button className="text-button" onClick={()=>load()}>重试</button></p>}{notice&&<p className="care-success" role="status">{notice}</p>}
+      <div className="care-bento-layout is-full">
+        <div className="care-bento-main">
+          {loading&&!items.length?<div className="care-feed-loading" role="status">正在看看大家的新动态…</div>:<div className="care-bento-grid">{all.map((post,i)=><BentoCard key={post.id} post={post} variant={bentoVariants[i%bentoVariants.length]} user={user} onOpen={open} onLogin={onLogin} api={api} onLiked={liked}/>)}</div>}
+          <div className="care-bento-more">{loading?'正在加载…':cursor?<button type="button" className="secondary" onClick={()=>load(true)}>加载更多动态</button>:<span>已经到底了</span>}<span className="care-bento-total">已显示 {all.length} 条</span></div>
+        </div>
+      </div>
+    </>}
+    {channel==='canteen'&&<CanteenBoard user={user} api={api} Modal={Modal} onLogin={onLogin}/>}
+    {channel==='games'&&<GamesBoard/>}
     {selected&&<PostReader post={selected} items={all} api={api} Modal={Modal} user={user} onLogin={onLogin} onClose={()=>setSelected(null)} onSelect={open} onChanged={changed} onEdit={p=>{setSelected(null);setComposer(p);}}/>}
-    {composer&&<PostComposer initial={composer.id?composer:null} initialValue={composer.id?null:composer} api={api} Modal={Modal} onClose={()=>setComposer(null)} onDone={post=>{setComposer(null);setNotice('已发布到摸鱼空间。');setFilter('');setItems(old=>[post,...old.filter(p=>p.id!==post.id)]);setComposerKey(k=>k+1);}}/>}
+    {composer&&<PostComposer initial={composer.id?composer:null} initialValue={composer.id?null:composer} api={api} Modal={Modal} onClose={()=>setComposer(null)} onDone={post=>{setComposer(null);setNotice('已发布到摸鱼空间。');setItems(old=>[post,...old.filter(p=>p.id!==post.id)]);}}/>}
   </section>;
 }
 

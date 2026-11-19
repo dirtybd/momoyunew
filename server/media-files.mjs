@@ -8,7 +8,7 @@ import {pipeline} from 'node:stream/promises';
 
 const fail=(status,code,message)=>Object.assign(new Error(message),{status,code});
 export const videoExt=/\.(mp4|webm|mov)$/i;
-export function storageUsed(db,userId){return [['attachments','uploader_id'],['care_media','owner_id'],['official_media','owner_id']].reduce((total,[table,owner])=>total+(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table)?db.prepare(`SELECT coalesce(sum(size),0) n FROM ${table} WHERE ${owner}=?`).get(userId).n:0),0);}
+export function storageUsed(db,userId){return [['attachments','uploader_id'],['care_media','owner_id'],['official_media','owner_id'],['canteen_photos','owner_id']].reduce((total,[table,owner])=>total+(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table)?db.prepare(`SELECT coalesce(sum(size),0) n FROM ${table} WHERE ${owner}=?`).get(userId).n:0),0);}
 export async function receiveFile(req,{root,maxBytes,limitForName=()=>maxBytes}){
   await mkdir(root,{recursive:true});const path=resolve(root,randomUUID()+'.upload');
   let parser,fileTask,result,failure,activeFile;
