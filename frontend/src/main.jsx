@@ -139,11 +139,12 @@ function App(){
 function cardClasses(style, base, artwork){const s=visualStyle(style);return `${base}${artwork?' card-artwork':''} card-theme-${s.theme} card-layout-${s.layout} card-radius-${s.radius} card-emphasis-${s.emphasis} card-background-${s.background} card-shape-${s.shape}`}
 function artworkStyle(card){const a=card.cardArtwork,cover=card.cardCover,position={'--cover-position':card.cardStyle?.coverPosition||'center'};if(!a&&!cover)return position;if(!a)return {...position,'--cover-image':`url("${cover.url}")`};return {...position,'--cover-image':`url("${cover?.url||`/api/requests/${encodeURIComponent(card.id)}/artwork.svg?v=${a.id}`}")`,'--card-bg':a.design.paper,'--card-ink':a.design.ink,'--card-muted':a.design.ink,'--card-accent':a.design.ink,'--card-border':a.design.ink+'26'};}
 function Marquee({requests,paused,onOpen}){
- const rowCount=Math.min(3,Math.ceil(requests.length/4));
+ const rowCount=Math.min(3,requests.length);
  if(!rowCount)return null;
  const rows=Array.from({length:rowCount},(_,i)=>requests.filter((_,n)=>n%rowCount===i));
  return <div className={'marquee-wall'+(paused?' is-paused':'')} aria-label="流动需求卡片">{rows.map((row,i)=>{
- const repeats=Math.ceil(4/row.length);
+ // Five card slots cover the widest flow column, even when a row has few requests.
+ const repeats=Math.ceil(5/row.length);
  return <div className="marquee-lane" key={i} tabIndex={0} aria-label={`第 ${i+1} 行需求，可横向滚动`}><div className={'marquee-track '+(i===1?'reverse':'')}>
  {[0,1].map(group=><div className="marquee-group" key={group} aria-hidden={group===1?true:undefined}>{Array.from({length:repeats},(_,repeat)=>row.map(r=><button key={`${repeat}-${r.id}`} data-copy={repeat>0||undefined} tabIndex={group||repeat?-1:0} aria-hidden={group||repeat?true:undefined} className={cardClasses(r.cardStyle,'marquee-card',r.cardArtwork||r.cardCover)} style={artworkStyle(r)} title={r.title} onClick={()=>onOpen(r)}><span className="marquee-meta"><span className="marquee-source">{r.source==='official'?'官方发布':'员工互助'}{r.isDemo?' · 演示':''}</span><span className="marquee-status">{status[r.status]||r.status}</span></span><strong>{r.title}</strong><TaskEconomy request={r} compact/><span className="marquee-problem">{r.problem||'详情待补充'}</span><span className="marquee-foot"><span className="marquee-skill">{(r.skills||[]).slice(0,3).join(' / ')||'技能待补充'}</span><span className="marquee-open">查看详情 <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M4 12 12 4M5 4h7v7"/></svg></span></span></button>))}</div>)}
  </div></div>})}</div>

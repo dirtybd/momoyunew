@@ -1,27 +1,41 @@
 import {test,expect} from '@playwright/test';
 
-test('卡片按需求数量分行并真实滚动，悬停、手动暂停和详情暂停均可用',async({page})=>{
+test('卡片分三行反向滚动，关闭详情后继续流动',async({page})=>{
  await page.emulateMedia({reducedMotion:'no-preference'});
  await page.goto('/');
- const wall=page.locator('.marquee-wall'), track=page.locator('.marquee-track').first();
- await expect(page.locator('.marquee-lane')).toHaveCount(2);
- await expect(track).toHaveCSS('animation-play-state','running');
- const position=()=>track.evaluate(el=>getComputedStyle(el).transform);
- const before=await position();await page.waitForTimeout(200);
- expect(await position()).not.toBe(before);
+ await page.getByRole('button',{name:'流动',exact:true}).click();
+ await page.mouse.move(0,0);
+ const wall=page.locator('.marquee-wall'), tracks=wall.locator('.marquee-track');
+ const track=tracks.first();
+ await expect(tracks).toHaveCount(3);
+ const positions=()=>tracks.evaluateAll(elements=>elements.map(el=>new DOMMatrix(getComputedStyle(el).transform).m41));
+ const before=await positions();
+ await expect.poll(async()=>{
+   const after=await positions();
+   return after.map((x,i)=>Math.sign(x-before[i]));
+ }).toEqual([-1,1,-1]);
  await wall.hover();
  await expect(track).toHaveCSS('animation-play-state','paused');
- const stopped=await position();await page.waitForTimeout(200);
- expect(await position()).toBe(stopped);
- await page.locator('.marquee-toggle').click();
+ const stopped=await positions();await page.waitForTimeout(200);
+ expect(await positions()).toEqual(stopped);
+ await page.getByRole('button',{name:'暂停滚动',exact:true}).click();
  await expect(track).toHaveCSS('animation-play-state','paused');
- await page.locator('.marquee-toggle').click();
+ await page.getByRole('button',{name:'继续滚动',exact:true}).click();
  await expect(track).toHaveCSS('animation-play-state','running');
-  await wall.hover();
-  await expect(track).toHaveCSS('animation-play-state','paused');
- await page.locator('.marquee-card').first().click();
+ await wall.hover();
+ await track.getByRole('button').first().click();
  await expect(page.getByRole('dialog',{name:'需求详情'})).toBeVisible();
  await expect(wall).toHaveClass(/is-paused/);
+ await page.getByRole('dialog',{name:'需求详情'}).getByRole('button',{name:'关闭',exact:true}).click();
+ await page.mouse.move(0,0);
+ await expect(wall).not.toHaveClass(/is-paused/);
+ await expect(track.getByRole('button').first()).toBeFocused();
+ await expect(track).toHaveCSS('animation-play-state','running',{timeout:2000});
+ const resumed = await positions();
+ await expect.poll(positions).not.toEqual(resumed);
+ await page.keyboard.press('Tab');
+ await expect(track.getByRole('button').nth(1)).toBeFocused();
+ await expect(track).toHaveCSS('animation-play-state','paused');
 });
 
 test('普通问题不生成卡片，对话改样式后预览、发布和刷新保留',async({page})=>{
